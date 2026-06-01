@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Store Route Planner — SG</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+:root{--bg:#f5f4f0;--surface:#fff;--border:#dddbd4;--border2:#c8c6be;--text:#1a1916;--muted:#6b6960;--accent:#1a4d8f;--danger:#b83232;--success:#0d6e4f;--warning:#c47d10;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+header{height:46px;background:var(--text);color:#fff;display:flex;align-items:center;padding:0 10px;gap:6px;flex-shrink:0;z-index:1000;}
+header h1{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;letter-spacing:.04em;color:#fff;flex:1;white-space:nowrap;}
+.hbtn{font-size:11px;padding:4px 9px;border-radius:4px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;white-space:nowrap;}
+.hbtn:hover{background:rgba(255,255,255,.12);}
+.hbtn.active{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.5);}
+.hbtn.accent{background:#1a4d8f;border-color:#2a6dbd;}
+.main{display:flex;flex:1;overflow:hidden;}
+.sidebar{background:var(--surface);display:flex;flex-direction:column;overflow:hidden;transition:width .2s,min-width .2s;border-right:1px solid var(--border);}
+.sidebar.right{border-right:none;border-left:1px solid var(--border);}
+.sidebar.collapsed{width:32px!important;min-width:32px!important;}
+.sb-toggle{width:32px;height:32px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);flex-shrink:0;}
+.sb-toggle:hover{color:var(--text);background:var(--bg);}
+.sb-title-bar{display:flex;align-items:center;border-bottom:1px solid var(--border);flex-shrink:0;min-height:32px;}
+.sb-title{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;padding:0 4px;flex:1;white-space:nowrap;overflow:hidden;}
+.sb-content{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.collapsed .sb-content{display:none;}
+.collapsed .sb-title{display:none;}
+#left-sb{width:280px;min-width:280px;}
+.sb-sec{padding:8px 10px 6px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.lbl{font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;}
+input[type=text],input[type=number],input[type=time],select,textarea{width:100%;padding:5px 8px;font-size:11px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+#search{margin-bottom:5px;}
+.filter-row{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px;}
+.fbtn{font-size:10px;padding:2px 6px;border-radius:3px;border:1px solid;cursor:pointer;font-family:'IBM Plex Mono',monospace;white-space:nowrap;}
+.chk-row{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted);cursor:pointer;margin-top:2px;}
+.chk-row input{cursor:pointer;width:auto;}
+#store-list{flex:1;overflow-y:auto;}
+#store-list::-webkit-scrollbar{width:3px;}
+#store-list::-webkit-scrollbar-thumb{background:var(--border2);}
+.sitem{display:flex;align-items:center;padding:5px 10px;border-bottom:1px solid var(--border);gap:6px;}
+.sitem.is-closed{opacity:.4;}
+.sitem:hover{background:var(--bg);}
+.bdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.sitem-name{flex:1;min-width:0;}
+.sname{font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:var(--text);}
+.sname:hover{color:var(--accent);}
+.sbrand{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);}
+.sacts{display:flex;gap:2px;}
+.sact{width:20px;height:20px;border-radius:3px;border:1px solid var(--border2);background:transparent;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);}
+.sact:hover{background:var(--bg);color:var(--text);}
+.sact.on-route{background:var(--accent);border-color:var(--accent);color:#fff;}
+.sact.is-cl{background:var(--danger);border-color:var(--danger);color:#fff;}
+.tag{font-size:9px;padding:1px 3px;border-radius:2px;margin-left:2px;font-family:'IBM Plex Mono',monospace;color:#fff;}
+.tag-closed{background:var(--danger);}
+.tag-adhoc{background:var(--warning);}
+#map{flex:1;}
+#right-sb{width:260px;min-width:260px;}
+.rp-count{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:400;color:var(--text);}
+.rp-sub{font-size:10px;color:var(--muted);}
+#route-stops{flex:1;overflow-y:auto;}
+#route-stops::-webkit-scrollbar{width:3px;}
+#route-stops::-webkit-scrollbar-thumb{background:var(--border2);}
+.rstop{padding:5px 8px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:4px;}
+.rnum{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:500;color:#fff;background:var(--accent);border-radius:3px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.rnum.adhoc{background:var(--warning);}
+.rtext{flex:1;min-width:0;}
+.rname{font-size:11px;line-height:1.3;color:var(--text);}
+.rbrand{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);}
+.rctrl{display:flex;flex-direction:column;gap:1px;}
+.rcbtn{width:16px;height:13px;border:none;background:transparent;cursor:pointer;font-size:9px;color:var(--muted);display:flex;align-items:center;justify-content:center;border-radius:2px;}
+.rcbtn:hover{background:var(--bg);color:var(--text);}
+.rcbtn.del{color:var(--danger);}
+.route-empty{padding:16px 10px;font-size:11px;color:var(--muted);text-align:center;line-height:1.7;}
+.export-sec{padding:7px 8px;border-top:1px solid var(--border);flex-shrink:0;}
+.ebtn{display:flex;align-items:center;gap:5px;width:100%;padding:5px 8px;border-radius:4px;border:1px solid var(--border2);background:var(--bg);cursor:pointer;font-size:11px;font-family:'IBM Plex Sans',sans-serif;color:var(--text);margin-bottom:3px;text-align:left;}
+.ebtn:hover{border-color:var(--accent);color:var(--accent);}
+.ebtn.ai-btn{border-color:var(--accent);color:var(--accent);background:#eef3fa;}
+.clr-btn{width:100%;padding:3px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:10px;font-family:'IBM Plex Sans',sans-serif;color:var(--muted);margin-top:2px;}
+.clr-btn:hover{color:var(--danger);border-color:var(--danger);}
+.map-line-row{padding:5px 8px;border-top:1px solid var(--border);display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted);flex-shrink:0;}
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:flex-start;justify-content:center;padding-top:30px;overflow-y:auto;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:18px;width:460px;max-width:96vw;margin-bottom:30px;}
+.modal h3{font-size:13px;font-weight:600;margin-bottom:12px;font-family:'IBM Plex Mono',monospace;}
+.frow{margin-bottom:8px;}
+.flbl{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:2px;}
+.ferr{font-size:10px;color:var(--danger);margin-top:2px;display:none;}
+.fok{font-size:10px;color:var(--success);margin-top:2px;display:none;}
+.fhint{font-size:10px;color:var(--muted);margin-top:2px;}
+.mbtns{display:flex;gap:8px;margin-top:8px;}
+.mbtns button{flex:1;padding:7px;border-radius:4px;cursor:pointer;font-size:12px;font-family:'IBM Plex Sans',sans-serif;font-weight:500;}
+.btn-p{background:var(--accent);color:#fff;border:none;}
+.btn-p:hover{background:#163f75;}
+.btn-p:disabled{background:#aaa;cursor:not-allowed;}
+.btn-c{background:transparent;color:var(--muted);border:1px solid var(--border2);}
+.btn-c:hover{color:var(--text);}
+.btn-d{background:transparent;color:var(--danger);border:1px solid var(--danger);cursor:pointer;font-size:11px;font-family:'IBM Plex Sans',sans-serif;padding:6px;border-radius:4px;width:100%;}
+.btn-d:hover{background:#fdf0f0;}
+.h-row{display:flex;gap:8px;}
+.h-row>div{flex:1;}
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{flex:1;padding:7px 4px;font-size:10px;font-family:'IBM Plex Mono',monospace;text-align:center;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;background:transparent;border-top:none;border-left:none;border-right:none;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-pane{display:none;flex:1;overflow:hidden;flex-direction:column;}
+.tab-pane.active{display:flex;}
+/* DRIVER/VEHICLE PANEL */
+.dv-list{flex:1;overflow-y:auto;padding:6px 8px;}
+.dv-item{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 8px;margin-bottom:6px;position:relative;}
+.dv-item h4{font-size:11px;font-weight:600;margin-bottom:2px;}
+.dv-item p{font-size:10px;color:var(--muted);}
+.dv-item .dv-acts{position:absolute;top:6px;right:6px;display:flex;gap:3px;}
+.dv-badge{display:inline-block;font-size:9px;padding:1px 5px;border-radius:10px;font-family:'IBM Plex Mono',monospace;margin-top:3px;}
+.add-mini-btn{margin:0 8px 8px;width:calc(100% - 16px);padding:5px;border-radius:4px;border:1px dashed var(--border2);background:transparent;cursor:pointer;font-size:11px;color:var(--muted);}
+.add-mini-btn:hover{border-color:var(--accent);color:var(--accent);}
+/* GOODS PANEL */
+.goods-item{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 8px;margin-bottom:6px;position:relative;}
+.goods-item h4{font-size:11px;font-weight:600;}
+.goods-item p{font-size:10px;color:var(--muted);}
+/* TIMING */
+.stop-timing{font-size:10px;color:var(--warning);margin-top:1px;}
+/* AI MODAL */
+#ai-modal .modal{width:560px;}
+#ai-result-area{background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:10px;font-size:11px;min-height:100px;max-height:300px;overflow-y:auto;line-height:1.7;margin-bottom:8px;white-space:pre-wrap;}
+
+/* TOAST */
+#toast{position:fixed;bottom:14px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--text);color:#fff;padding:6px 14px;border-radius:4px;font-size:11px;z-index:99999;transition:transform .2s;pointer-events:none;font-family:'IBM Plex Mono',monospace;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+/* Timing input on route stop */
+.stop-dur{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px;margin-top:2px;}
+.stop-dur input{width:40px;padding:1px 3px;font-size:10px;text-align:center;}
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9632; SG Route Planner</h1>
+  <button class="hbtn accent" onclick="openAddModal(false)">+ Store</button>
+  <button class="hbtn" onclick="openAddModal(true)">+ Ad-hoc</button>
+  <button class="hbtn" id="show-closed-btn" onclick="toggleShowClosed()">Show Closed</button>
+  <button class="hbtn" onclick="openTab('drivers')">&#128101; Drivers &amp; Vehicles</button>
+  <button class="hbtn" onclick="openTab('goods')">&#128230; Goods</button>
+  <button class="hbtn" onclick="exportJSON()">&#8681; Backup</button>
+  <button class="hbtn" onclick="importJSON()">&#8679; Restore</button>
+</header>
+
+<div class="main">
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar" id="left-sb">
+    <div class="sb-title-bar">
+      <button class="sb-toggle" onclick="toggleSB('left')">&#9776;</button>
+      <span class="sb-title">Find Store</span>
+    </div>
+    <div class="sb-content">
+      <div class="sb-sec">
+        <input type="text" id="search" placeholder="Search name, brand, address…" oninput="renderList()"/>
+        <div class="filter-row" id="filter-row"></div>
+        <label class="chk-row"><input type="checkbox" id="hide-unsel" onchange="renderList()"/> Hide stores not in route</label>
+        <label class="chk-row"><input type="checkbox" id="hide-closed-list" onchange="renderList()"/> Hide closed stores</label>
+        <label class="chk-row"><input type="checkbox" id="route-only-map" onchange="renderMapMarkers()"/> Show only route stops on map</label>
+      </div>
+      <div id="store-list"></div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- RIGHT SIDEBAR - ROUTE -->
+  <div class="sidebar right" id="right-sb">
+    <div class="sb-title-bar">
+      <button class="sb-toggle" onclick="toggleSB('right')">&#9776;</button>
+      <span class="sb-title">Route</span>
+    </div>
+    <div class="sb-content">
+      <!-- TABS -->
+      <div class="tabs">
+        <button class="tab active" id="tab-route" onclick="switchTab('route')">Route</button>
+        <button class="tab" id="tab-drivers" onclick="switchTab('drivers')">Drivers</button>
+        <button class="tab" id="tab-goods" onclick="switchTab('goods')">Goods</button>
+      </div>
+
+      <!-- ROUTE TAB -->
+      <div class="tab-pane active" id="pane-route">
+        <div class="sb-sec">
+          <div class="rp-count"><span id="stop-count">0</span></div>
+          <div class="rp-sub">stops · <span id="route-eta-summary">-</span></div>
+          <!-- START CONFIG -->
+          <div style="margin-top:6px;">
+            <span class="lbl">Start time &amp; point</span>
+            <div class="h-row">
+              <div><input type="time" id="start-time" value="08:00" onchange="recalcETA()"/></div>
+              <div>
+                <select id="start-driver" onchange="recalcETA()">
+                  <option value="">— Driver —</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-top:4px;">
+              <select id="start-vehicle" onchange="checkCapacity()">
+                <option value="">— Vehicle —</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div id="route-stops"><div class="route-empty">Click + on any store<br>to add to route.<br><br>Assign a driver &amp; vehicle,<br>then use AI to optimise.</div></div>
+        <div class="map-line-row">
+          <input type="checkbox" id="show-line" checked onchange="drawRoute()"/>
+          <label for="show-line" style="cursor:pointer;">Show route on map</label>
+        </div>
+        <div id="capacity-warn" style="display:none;padding:5px 8px;background:#fff8ee;border-top:1px solid #f5d78e;font-size:10px;color:#a06000;"></div>
+        <div class="export-sec">
+          <span class="lbl">Optimise &amp; Export</span>
+          <button class="ebtn ai-btn" onclick="openAIModal()">&#10024; AI optimise route</button>
+          <button class="ebtn" onclick="showRouteSummary()">&#128203; Route summary &amp; ETA</button>
+          <button class="ebtn" onclick="exportGoogleMaps()">&#9654; Google Maps</button>
+          <button class="ebtn" onclick="exportWaze()">&#9670; Waze</button>
+          <button class="ebtn" onclick="copyStops()">&#9741; Copy stop list</button>
+          <button class="clr-btn" onclick="clearRoute()">Clear route</button>
+        </div>
+      </div>
+
+      <!-- DRIVERS TAB -->
+      <div class="tab-pane" id="pane-drivers">
+        <div class="dv-list" id="driver-list"></div>
+        <button class="add-mini-btn" onclick="openDriverModal()">+ Add Driver</button>
+        <div style="border-top:1px solid var(--border);padding:6px 8px;"><span class="lbl">Vehicles</span></div>
+        <div class="dv-list" id="vehicle-list"></div>
+        <button class="add-mini-btn" onclick="openVehicleModal()">+ Add Vehicle</button>
+      </div>
+
+      <!-- GOODS TAB -->
+      <div class="tab-pane" id="pane-goods">
+        <div class="dv-list" id="goods-list"></div>
+        <button class="add-mini-btn" onclick="openGoodsModal()">+ Add Goods</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STORE MODAL ────────────────────────────────────────────────────────── -->
+<div class="modal-bg" id="store-modal">
+<div class="modal">
+  <h3 id="modal-title">Add Store</h3>
+  <div class="frow" id="adhoc-row" style="display:none;"><span class="flbl">Task / Note</span><textarea id="m-adhoc" rows="2" placeholder="e.g. Collect documents from reception"></textarea></div>
+  <div class="frow"><span class="flbl">Name *</span><input type="text" id="m-name" placeholder="e.g. Northpoint City"/></div>
+  <div class="frow" id="brand-row"><span class="flbl">Brand *</span>
+    <select id="m-brand" onchange="onBrandChange()"></select>
+    <div id="new-brand-wrap" style="display:none;margin-top:4px;">
+      <div class="h-row">
+        <div><input type="text" id="m-new-brand" placeholder="Brand name e.g. iChickenRice"/></div>
+        <div style="flex:0 0 80px;display:flex;gap:4px;">
+          <input type="color" id="m-brand-color" value="#e05c00" style="width:34px;height:28px;padding:2px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;"/>
+          <button onclick="addNewBrand()" style="flex:1;font-size:10px;padding:0 4px;border-radius:4px;border:1px solid var(--border2);background:var(--bg);cursor:pointer;">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="frow"><span class="flbl">Postal Code * (6 digits)</span>
+    <input type="text" id="m-postal" maxlength="6" placeholder="e.g. 769098" oninput="onPostalInput()" style="font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;"/>
+    <div class="ferr" id="postal-err">Invalid postal code.</div>
+    <div class="fok" id="postal-ok"></div>
+  </div>
+  <div class="frow"><span class="flbl">Address (auto-filled)</span>
+    <input type="text" id="m-addr" placeholder="Auto-filled from postal code"/>
+    <div class="ferr" id="addr-err">Address required.</div>
+  </div>
+  <div class="h-row frow">
+    <div><span class="flbl">Latitude</span><input type="text" id="m-lat" readonly style="background:#f0f0ec;font-family:'IBM Plex Mono',monospace;font-size:10px;"/></div>
+    <div><span class="flbl">Longitude</span><input type="text" id="m-lng" readonly style="background:#f0f0ec;font-family:'IBM Plex Mono',monospace;font-size:10px;"/></div>
+  </div>
+  <div class="frow"><span class="flbl">Stop duration (mins)</span><input type="number" id="m-dur" value="15" min="1" max="240" style="width:80px;"/><div class="fhint">Time driver spends at this location</div></div>
+  <div class="frow" id="del-row" style="display:none;"><button class="btn-d" onclick="deleteStore()">Delete store permanently</button></div>
+  <div class="mbtns"><button class="btn-c" onclick="closeModal('store-modal')">Cancel</button><button class="btn-p" id="save-store-btn" onclick="saveStore()">Save</button></div>
+</div></div>
+
+<!-- ── DRIVER MODAL ─────────────────────────────────────────────────────────── -->
+<div class="modal-bg" id="driver-modal">
+<div class="modal">
+  <h3 id="driver-modal-title">Add Driver</h3>
+  <div class="frow"><span class="flbl">Driver Name *</span><input type="text" id="d-name" placeholder="e.g. Ali"/></div>
+  <div class="frow"><span class="flbl">Contact / Notes</span><input type="text" id="d-contact" placeholder="e.g. 9123 4567"/></div>
+  <div class="frow" id="d-del-row" style="display:none;"><button class="btn-d" onclick="deleteDriver()">Delete driver</button></div>
+  <div class="mbtns"><button class="btn-c" onclick="closeModal('driver-modal')">Cancel</button><button class="btn-p" onclick="saveDriver()">Save</button></div>
+</div></div>
+
+<!-- ── VEHICLE MODAL ─────────────────────────────────────────────────────────── -->
+<div class="modal-bg" id="vehicle-modal">
+<div class="modal">
+  <h3 id="vehicle-modal-title">Add Vehicle</h3>
+  <div class="frow"><span class="flbl">Vehicle Name / Plate *</span><input type="text" id="v-name" placeholder="e.g. Lorry SBC1234A"/></div>
+  <div class="frow"><span class="flbl">Type</span><select id="v-type"><option>Lorry</option><option>Van</option><option>Car</option><option>Motorcycle</option><option>Other</option></select></div>
+  <div class="frow"><span class="flbl">Cargo Capacity (H × L × W in cm) *</span>
+    <div class="h-row">
+      <div><input type="number" id="v-h" placeholder="H (cm)" min="1"/></div>
+      <div><input type="number" id="v-l" placeholder="L (cm)" min="1"/></div>
+      <div><input type="number" id="v-w" placeholder="W (cm)" min="1"/></div>
+    </div>
+    <div class="fhint">Volume = H × L × W cm³</div>
+  </div>
+  <div class="frow"><span class="flbl">Notes (e.g. max load, restrictions)</span><input type="text" id="v-notes" placeholder="e.g. Max 2 tonnes"/></div>
+  <div class="frow" id="v-del-row" style="display:none;"><button class="btn-d" onclick="deleteVehicle()">Delete vehicle</button></div>
+  <div class="mbtns"><button class="btn-c" onclick="closeModal('vehicle-modal')">Cancel</button><button class="btn-p" onclick="saveVehicle()">Save</button></div>
+</div></div>
+
+<!-- ── GOODS MODAL ─────────────────────────────────────────────────────────── -->
+<div class="modal-bg" id="goods-modal">
+<div class="modal">
+  <h3 id="goods-modal-title">Add Goods</h3>
+  <div class="frow"><span class="flbl">Goods Name *</span><input type="text" id="g-name" placeholder="e.g. Bread (large tray)"/></div>
+  <div class="frow"><span class="flbl">Dimensions (H × L × W in cm) *</span>
+    <div class="h-row">
+      <div><input type="number" id="g-h" placeholder="H" min="1"/></div>
+      <div><input type="number" id="g-l" placeholder="L" min="1"/></div>
+      <div><input type="number" id="g-w" placeholder="W" min="1"/></div>
+    </div>
+  </div>
+  <div class="frow"><span class="flbl">Quantity per delivery</span><input type="number" id="g-qty" value="1" min="1"/></div>
+  <div class="frow"><span class="flbl">Notes</span><input type="text" id="g-notes" placeholder="e.g. Fragile, keep upright"/></div>
+  <div class="frow" id="g-del-row" style="display:none;"><button class="btn-d" onclick="deleteGoods()">Delete goods</button></div>
+  <div class="mbtns"><button class="btn-c" onclick="closeModal('goods-modal')">Cancel</button><button class="btn-p" onclick="saveGoods()">Save</button></div>
+</div></div>
+
+<!-- ── AI MODAL ─────────────────────────────────────────────────────────────── -->
+<div class="modal-bg" id="ai-modal">
+<div class="modal" id="ai-modal-inner">
+  <h3>&#10024; AI Route Optimiser</h3>
+
+  <!-- STEP 1 -->
+  <div id="ai-step1">
+    <div style="background:#eef3fa;border-left:3px solid #1a4d8f;padding:8px 10px;border-radius:4px;margin-bottom:10px;font-size:11px;line-height:1.6;">
+      <b>How it works:</b><br>
+      1. Fill in constraints below (optional)<br>
+      2. Click <b>Copy prompt to clipboard</b><br>
+      3. Open <a href="https://claude.ai" target="_blank" style="color:#1a4d8f;">claude.ai</a> and paste — Claude will reply with an optimised order<br>
+      4. Copy Claude's reply, paste it back here and click <b>Apply AI response</b>
+    </div>
+    <div class="frow"><span class="flbl">Constraints / Edge cases (optional)</span>
+      <textarea id="ai-adjust" rows="2" placeholder="e.g. Start from factory. Avoid PIE. Do East stops first. Driver must be back by 4pm."></textarea>
+    </div>
+    <div class="frow"><span class="flbl">Start point (optional)</span>
+      <input type="text" id="ai-start" placeholder="e.g. Factory at Kampong Ampat — must be first stop"/>
+    </div>
+    <div class="mbtns" style="margin-bottom:8px;">
+      <button class="btn-c" onclick="closeModal('ai-modal')">Close</button>
+      <button class="btn-p" onclick="copyAIPrompt()">&#128203; Copy prompt to clipboard</button>
+    </div>
+    <div id="copy-confirm" style="display:none;background:#f0fff4;border:1px solid #7ec8a0;border-radius:4px;padding:7px 10px;font-size:11px;color:#0a5a2a;margin-bottom:8px;">
+      &#10003; Prompt copied! <a href="https://claude.ai" target="_blank" style="color:#1a4d8f;font-weight:600;">Open Claude.ai &#8599;</a> and paste it in.
+    </div>
+  </div>
+
+  <!-- STEP 2: paste response back -->
+  <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:10px;">
+    <span class="flbl">Paste Claude's reply here, then apply</span>
+    <textarea id="ai-response-paste" rows="5" placeholder="Paste Claude's full response here after it replies on claude.ai…" style="margin-bottom:6px;font-size:11px;"></textarea>
+    <button class="btn-p" onclick="applyPastedAI()" style="width:100%;">&#10003; Apply AI response to route</button>
+    <div id="apply-result" style="display:none;margin-top:6px;padding:6px 8px;border-radius:4px;font-size:11px;"></div>
+  </div>
+
+</div></div>
+
+<!-- ── GOODS ASSIGN MODAL ─────────────────────────────────────────────────── -->
+<div class="modal-bg" id="goods-assign-modal">
+<div class="modal">
+  <h3 id="ga-title">Assign Goods to Stop</h3>
+  <div id="ga-body"></div>
+  <div class="mbtns"><button class="btn-c" onclick="closeModal('goods-assign-modal')">Close</button><button class="btn-p" onclick="saveGoodsAssign()">Save</button></div>
+</div></div>
+
+
+<!-- ROUTE SUMMARY MODAL -->
+<div class="modal-bg" id="summary-modal">
+<div class="modal" style="width:520px;">
+  <h3>&#128203; Route Summary</h3>
+  <div id="summary-body" style="font-size:12px;line-height:1.8;"></div>
+  <div class="mbtns" style="margin-top:10px;">
+    <button class="btn-c" onclick="closeModal('summary-modal')">Close</button>
+    <button class="btn-p" onclick="copySummary()">&#9741; Copy</button>
+  </div>
+</div></div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── BRANDS ──────────────────────────────────────────────────────────────────
+const DEF_BRANDS={'I-TEA':'#185FA5','Duozoulu':'#0F6E56','Vivaia':'#993C1D','Beneunder':'#993556','I-Bread':'#854F0B','I-Pot':'#534AB7','Office':'#5F5E5A','Ad-hoc':'#c47d10'};
+let BRANDS={};
+function loadBrands(){try{const b=localStorage.getItem('sg_brands');BRANDS=b?JSON.parse(b):{...DEF_BRANDS};}catch(e){BRANDS={...DEF_BRANDS};}}
+function saveBrands(){localStorage.setItem('sg_brands',JSON.stringify(BRANDS));}
+function bc(b){return BRANDS[b]||'#888780';}
+
+// ── DEFAULT STORES ──────────────────────────────────────────────────────────
+const DS=[
+  {b:'I-TEA',n:'TP201 – Tampines St 21',a:'Blk 201B Tampines Street 21 #01-K1',lat:1.353375,lng:103.953077,dur:15},
+  {b:'I-TEA',n:'TP828 – Tampines St 81',a:'Blk 828A Tampines Street 81 #01-156',lat:1.349126,lng:103.934276,dur:15},
+  {b:'I-TEA',n:'EM – Elias Road',a:'Blk 625 Elias Road #01-K6',lat:1.378614,lng:103.942044,dur:15},
+  {b:'I-TEA',n:'OTH – Our Tampines Hub',a:'1 Tampines Walk #B1-K29',lat:1.353535,lng:103.940253,dur:15},
+  {b:'I-TEA',n:'BD205 – Bedok North St 1',a:'Blk 205 Bedok North Street 1 #01-367',lat:1.326009,lng:103.930940,dur:15},
+  {b:'I-TEA',n:'FS84 – Bedok North St 4',a:'Blk 84 Bedok North Street 4 #01-73',lat:1.332058,lng:103.939232,dur:15},
+  {b:'I-TEA',n:'PLS – Paya Lebar Square',a:'60 Paya Lebar Road #01-50',lat:1.319492,lng:103.892750,dur:15},
+  {b:'I-TEA',n:'NEX – Serangoon',a:'20 Serangoon Ave 2 #B2-103',lat:1.350557,lng:103.871999,dur:15},
+  {b:'I-TEA',n:'TP – Tanjong Pagar Plaza',a:'1 Tanjong Pagar Plaza #01-52',lat:1.276216,lng:103.842838,dur:15},
+  {b:'I-TEA',n:'BK – Bendemeer Road',a:'Blk 25 Bendemeer Road #01-595',lat:1.318719,lng:103.862252,dur:15},
+  {b:'I-TEA',n:'YS – Northpoint City',a:'1 Northpoint Drive South Wing #B2-119',lat:1.428264,lng:103.835982,dur:15},
+  {b:'I-TEA',n:'KH846 – Yishun Ring Road',a:'Blk 846 Yishun Ring Road #01-3627',lat:1.416792,lng:103.834578,dur:15},
+  {b:'I-TEA',n:'WL888 – Woodlands Drive',a:'Blk 888 Woodlands Drive #01-747',lat:1.437484,lng:103.795158,dur:15},
+  {b:'I-TEA',n:'JR504 – Jurong West St 51',a:'Blk 504 Jurong West St 51 #01-243',lat:1.349225,lng:103.719200,dur:15},
+  {b:'I-TEA',n:'JR372 – Bukit Batok St 31',a:'Blk 372 Bukit Batok St 31 #01-370',lat:1.358909,lng:103.751211,dur:15},
+  {b:'I-TEA',n:'CL442 – Clementi Ave 3',a:'442 Clementi Avenue 3 #01-87',lat:1.314054,lng:103.764416,dur:15},
+  {b:'I-TEA',n:'BL221 – Boon Lay Shopping Ctr',a:'221 Boon Lay Place #01-116',lat:1.346208,lng:103.712434,dur:15},
+  {b:'I-TEA',n:'JW960 – Jurong West St 92',a:'Blk 960 Jurong West Street 92 #01-180',lat:1.341385,lng:103.691428,dur:15},
+  {b:'I-TEA',n:'JW495 – Jurong West St 41',a:'Blk 495 Jurong West Street 41 #01-104',lat:1.349745,lng:103.724346,dur:15},
+  {b:'I-TEA',n:'CL727 – Clementi West St 2',a:'Blk 727 Clementi West Street 2 #01-240',lat:1.304200,lng:103.763811,dur:15},
+  {b:'I-TEA',n:'BB154 – Bukit Batok St 11',a:'Blk 154 Bukit Batok Street 11 #01-310',lat:1.347680,lng:103.743986,dur:15},
+  {b:'I-TEA',n:'CP103 – Yishun Chong Pang',a:'Blk 103 Yishun Ring Road #01-65',lat:1.431968,lng:103.829203,dur:15},
+  {b:'I-TEA',n:'WP88 – Whampoa Drive',a:'Blk 88 Whampoa Drive #01-857',lat:1.323276,lng:103.855163,dur:15},
+  {b:'I-TEA',n:'HG811 – Hougang Central',a:'Blk 811 Hougang Central #01-210',lat:1.371758,lng:103.893878,dur:15},
+  {b:'I-TEA',n:'JE135 – Jurong Gateway Rd',a:'Blk 135 Jurong Gateway Road #01-327',lat:1.333839,lng:103.739715,dur:15},
+  {b:'I-TEA',n:'CT – Peoples Park Complex',a:'1 Park Road #01-K99I',lat:1.284536,lng:103.842329,dur:15},
+  {b:'I-TEA',n:'BP258 – Bukit Panjang Ring Rd',a:'Blk 258 Bukit Panjang Ring Road #01-52',lat:1.377894,lng:103.773136,dur:15},
+  {b:'I-TEA',n:'BW – Beauty World Centre',a:'144 Upper Bukit Timah Road #01-02',lat:1.342374,lng:103.776259,dur:15},
+  {b:'I-TEA',n:'HG682 – Hougang Ave 4',a:'Blk 682 Hougang Avenue 4 #01-360',lat:1.373668,lng:103.885449,dur:15},
+  {b:'I-TEA',n:'PR MRT – Pasir Ris MRT',a:'10 Pasir Ris Central #01-06',lat:1.373213,lng:103.949277,dur:15},
+  {b:'I-TEA',n:'BS282 – Bishan St 22',a:'Blk 282 Bishan Street 22 #01-151',lat:1.358250,lng:103.844901,dur:15},
+  {b:'I-TEA',n:'BL MRT – Boon Lay MRT',a:'301 Boon Lay Way #01-30',lat:1.338433,lng:103.705336,dur:15},
+  {b:'I-TEA',n:'HG1 – Hougang 1',a:'1 Hougang Street 91 #01-02',lat:1.375802,lng:103.879431,dur:15},
+  {b:'I-TEA',n:'BS513 – Bishan St 13',a:'Blk 513 Bishan Street 13 #01-504',lat:1.349433,lng:103.849479,dur:15},
+  {b:'I-TEA',n:'WL302 – Woodlands St 31',a:'Blk 302 Woodlands Street 31 #01-287',lat:1.431842,lng:103.774407,dur:15},
+  {b:'I-TEA',n:'TB18 – Jalan Membina',a:'Blk 18 Jalan Membina #01-04',lat:1.285395,lng:103.826727,dur:15},
+  {b:'I-TEA',n:'AMK531 – Ang Mo Kio Ave 10',a:'Blk 531 Ang Mo Kio Ave 10 #01-2441',lat:1.373311,lng:103.854461,dur:15},
+  {b:'I-TEA',n:'BB274 – Bukit Batok East Ave 4',a:'Blk 274 Bukit Batok East Avenue 4 #01-94',lat:1.348080,lng:103.757961,dur:15},
+  {b:'I-TEA',n:'TPY21 – Toa Payoh',a:'Blk 21 Lorong 7 Toa Payoh #01-284',lat:1.335228,lng:103.857528,dur:15},
+  {b:'I-TEA',n:'HLM – Heartland Mall Kovan',a:'Blk 205 Hougang Street 21 #02-08A',lat:1.359469,lng:103.885129,dur:15},
+  {b:'I-TEA',n:'CCK – Choa Chu Kang Ave 4',a:'10 Choa Chu Kang Avenue 4 #01-2B',lat:1.385409,lng:103.744333,dur:15},
+  {b:'I-TEA',n:'PSR442 – Pasir Ris Dr 6',a:'Blk 442 Pasir Ris Drive 6 #01-40',lat:1.369037,lng:103.957681,dur:15},
+  {b:'I-TEA',n:'J9 – Junction 9 Yishun',a:'18 Yishun Ave 9 #02-13',lat:1.433221,lng:103.841488,dur:15},
+  {b:'I-TEA',n:'BD57A – New Upper Changi',a:'Blk 57A New Upper Changi Road #01-1372',lat:1.324242,lng:103.941100,dur:15},
+  {b:'I-TEA',n:'AMK HUB – AMK Hub',a:'53 Ang Mo Kio Ave 3 #B1-66/67/68',lat:1.369002,lng:103.848159,dur:15},
+  {b:'I-TEA',n:'ADM – Woodlands Ave 6',a:'Blk 678A Woodlands Ave 6 #01-06A',lat:1.440414,lng:103.801623,dur:15},
+  {b:'I-TEA',n:'LAV – V Hotel Lavender',a:'70 Jellicoe Road #01-18',lat:1.307997,lng:103.862781,dur:15},
+  {b:'I-TEA',n:'T3 – Changi Airport T3',a:'65 Airport Boulevard #B2-30',lat:1.358371,lng:103.985641,dur:15},
+  {b:'I-TEA',n:'CRP – Bukit Timah NTUC Finest',a:'587 Bukit Timah Road #01-01',lat:1.323906,lng:103.809992,dur:15},
+  {b:'I-TEA',n:'BB MRT – Bukit Batok MRT',a:'10 Bukit Batok Central #01-02',lat:1.349058,lng:103.749625,dur:15},
+  {b:'I-TEA',n:'BS MRT – Bishan MRT',a:'200 Bishan Road #01-06',lat:1.350778,lng:103.848722,dur:15},
+  {b:'I-TEA',n:'HAIG – Haig View',a:'Haig Road Haig View 12 #01-333',lat:1.313577,lng:103.896063,dur:15},
+  {b:'I-TEA',n:'EP – Eastpoint Mall',a:'3 Simei Street 6 #01-K1',lat:1.342715,lng:103.953042,dur:15},
+  {b:'I-TEA',n:'SELEGIE – GR.iD',a:'1 Selegie Road #01-04',lat:1.300195,lng:103.849227,dur:15},
+  {b:'I-TEA',n:'i12 – East Coast Rd',a:'112 East Coast Road #B1-34',lat:1.305200,lng:103.905065,dur:15},
+  {b:'I-TEA',n:'CT2 – Peoples Park #K94A',a:'1 Park Road #01-K94A',lat:1.285700,lng:103.844500,dur:15},
+  {b:'I-TEA',n:'WSM – Wisma Atria Orchard',a:'435 Orchard Road #B1-02',lat:1.303715,lng:103.833264,dur:15},
+  {b:'I-TEA',n:'TMP MRT – Tampines MRT',a:'20 Tampines Central 1 #01-30',lat:1.353198,lng:103.945409,dur:15},
+  {b:'I-TEA',n:'CCP – Changi City Point',a:'5 Changi Business Park Central 1 #B1-K6',lat:1.334273,lng:103.962739,dur:15},
+  {b:'I-TEA',n:'HAJI LANE',a:'34 Haji Lane',lat:1.300887,lng:103.859041,dur:15},
+  {b:'I-TEA',n:'UNITED SQ – United Square',a:'101 Thomson Road #01-59',lat:1.317185,lng:103.843605,dur:15},
+  {b:'I-TEA',n:'WLD MRT – Woodlands MRT',a:'30 Woodlands Avenue 2 #01-40',lat:1.436897,lng:103.786581,dur:15},
+  {b:'I-TEA',n:'EUNOS MRT – Eunos Crescent',a:'30 Eunos Cres #01-10',lat:1.319705,lng:103.902856,dur:15},
+  {b:'I-TEA',n:'CTP – Chinatown Point',a:'133 New Bridge Rd #02-51',lat:1.285209,lng:103.844723,dur:15},
+  {b:'I-TEA',n:'PARKWAY – Parkway Parade',a:'80 Marine Parade Road #B1-83',lat:1.301337,lng:103.905233,dur:15},
+  {b:'I-TEA',n:'PUNGGOL PLAZA',a:'168 Punggol Field #01-09',lat:1.394175,lng:103.913040,dur:15},
+  {b:'I-TEA',n:'ANCHOR POINT – Alexandra Rd',a:'370 Alexandra Road #B1-13',lat:1.288572,lng:103.805144,dur:15},
+  {b:'I-TEA',n:'BUGIS+ – Victoria St',a:'201 Victoria St #05-09',lat:1.299596,lng:103.854219,dur:15},
+  {b:'I-TEA',n:'TMP GIANT – Tampines Giant',a:'21 Tampines North 2 #03-01',lat:1.372155,lng:103.931982,dur:15},
+  {b:'Duozoulu',n:'JP-ZULIZ – Jurong Point',a:'63 Jurong West Central 3 #03-66',lat:1.339700,lng:103.706100,dur:15},
+  {b:'Duozoulu',n:'NEX – Serangoon',a:'23 Serangoon Central #B1-56',lat:1.351200,lng:103.873200,dur:15},
+  {b:'Duozoulu',n:'JUNCTION 8 – Bishan',a:'9 Bishan Place #02-51',lat:1.351200,lng:103.849800,dur:15},
+  {b:'Duozoulu',n:'EASTPOINT MALL – Simei',a:'3 Simei Street 6 #01-21/22',lat:1.342900,lng:103.953800,dur:15},
+  {b:'Duozoulu',n:'WHITE SANDS – Pasir Ris',a:'1 Pasir Ris Central Street 3',lat:1.374200,lng:103.950200,dur:15},
+  {b:'Vivaia',n:'BUGIS JUNCTION',a:'200 Victoria St #01-11',lat:1.299400,lng:103.855200,dur:15},
+  {b:'Vivaia',n:'BEDOK MALL',a:'311 New Upper Changi Rd #01-65/66',lat:1.324600,lng:103.930500,dur:15},
+  {b:'Vivaia',n:'WISMA – Orchard',a:'435 Orchard Rd #B1-25',lat:1.304000,lng:103.833700,dur:15},
+  {b:'Vivaia',n:'VIVOCITY – Harbourfront',a:'1 Harbourfront Walk #02-199',lat:1.264100,lng:103.822100,dur:15},
+  {b:'Vivaia',n:'WESTGATE – Jurong',a:'3 Gateway Dr #02-16',lat:1.334200,lng:103.742200,dur:15},
+  {b:'Vivaia',n:'JEWEL – Changi Airport',a:'78 Airport Boulevard #B1-254/255',lat:1.360100,lng:103.989200,dur:15},
+  {b:'Vivaia',n:'PARKWAY PARADE',a:'80 Marine Parade Rd #01-27',lat:1.301600,lng:103.906100,dur:15},
+  {b:'Beneunder',n:'WESTGATE – Jurong',a:'3 Gateway Dr #02-41',lat:1.334100,lng:103.740200,dur:15},
+  {b:'I-Bread',n:'HG682 – Hougang Ave 4 (DEWI)',a:'Blk 682 Hougang Avenue 4 #01-360',lat:1.374000,lng:103.885800,dur:15},
+  {b:'I-Bread',n:'BW – Beauty World Ctr (DEWI)',a:'144 Upper Bukit Timah Road #01-08',lat:1.342700,lng:103.776700,dur:15},
+  {b:'I-Bread',n:'CL449 – Clementi Ave 3 (DEWI)',a:'449 Clementi Ave 3 #01-241',lat:1.314300,lng:103.765200,dur:15},
+  {b:'I-Bread',n:'TP – Tanjong Pagar (JONAS)',a:'1 Tanjong Pagar Plaza #01-52',lat:1.276500,lng:103.843200,dur:15},
+  {b:'I-Bread',n:'FACTORY – Kampong Ampat',a:'171 Kampong Ampat #04-14',lat:1.324300,lng:103.871400,dur:30},
+  {b:'I-Bread',n:'CS – Century Square (Guiyu)',a:'2 Tampines Central 5 #01-41',lat:1.342200,lng:103.952900,dur:15},
+  {b:'I-Bread',n:'TP201 – Tampines St 21 (Guiyu)',a:'Blk 201B Tampines St 21 #01-1075',lat:1.354000,lng:103.953800,dur:15},
+  {b:'I-Bread',n:'TPY21 – Toa Payoh (JONAS)',a:'Blk 21 Lorong 7 Toa Payoh #01-284',lat:1.335600,lng:103.858200,dur:15},
+  {b:'I-Bread',n:'CCK – Choa Chu Kang (DEWI)',a:'10 Choa Chu Kang Avenue 4 #01-2G',lat:1.385800,lng:103.745200,dur:15},
+  {b:'I-Bread',n:'PSR442 – Pasir Ris Dr 6 (Guiyu)',a:'Blk 442 Pasir Ris Drive 6 #01-40',lat:1.369400,lng:103.958200,dur:15},
+  {b:'I-Bread',n:'UncleBread – Hougang Ave 4 (JONAS)',a:'BLK 682 Hougang Avenue 4 #01-364',lat:1.373700,lng:103.886200,dur:15},
+  {b:'I-Pot',n:'PLS – Paya Lebar Square',a:'60 Paya Lebar Road #B1-07',lat:1.319800,lng:103.892700,dur:15},
+  {b:'I-Pot',n:'BW – Beauty World Centre',a:'144 Upper Bukit Timah Road #01-35',lat:1.342800,lng:103.777100,dur:15},
+  {b:'Office',n:'3S – Kaki Bukit Industrial',a:'10 Kaki Bukit Road 1 #03-18',lat:1.335700,lng:103.904300,dur:20},
+  {b:'Office',n:'3S Warehouse – Kaki Bukit',a:'10 Kaki Bukit Road 1 #01-38',lat:1.335500,lng:103.904100,dur:20},
+  {b:'Office',n:'Bread Factory – Kampong Ampat',a:'171 Kampong Ampat #04-14',lat:1.324300,lng:103.871600,dur:30},
+  {b:'Office',n:'HKC – Sims Ave',a:'324 Sims Avenue',lat:1.320500,lng:103.887500,dur:15},
+  {b:'Office',n:'COOLEN – Sims Ave',a:'330 Sims Avenue',lat:1.319500,lng:103.886500,dur:15},
+  {b:'Office',n:'3S NEW OFFICE – Tai Seng',a:'3 Tai Seng Avenue #04-37',lat:1.336600,lng:103.888600,dur:15}
+];
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let stores=[],closedIds=new Set(),routeStops=[],currentFilter='all',showClosed=false;
+let mapMarkers=[],routePolylines=[],editIdx=null,isAdhoc=false;
+let drivers=[],vehicles=[],goods=[];
+let editDriverIdx=null,editVehicleIdx=null,editGoodsIdx=null,assignStopIdx=null;
+let postalTimer=null,lastAIText='',lastAIOrder=null;
+
+// ── PERSIST ──────────────────────────────────────────────────────────────────
+function save(){
+  localStorage.setItem('sg_stores',JSON.stringify(stores));
+  localStorage.setItem('sg_closed',JSON.stringify([...closedIds]));
+  localStorage.setItem('sg_route',JSON.stringify(routeStops));
+  localStorage.setItem('sg_drivers',JSON.stringify(drivers));
+  localStorage.setItem('sg_vehicles',JSON.stringify(vehicles));
+  localStorage.setItem('sg_goods',JSON.stringify(goods));
+}
+function load(){
+  function lp(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch(e){return def;}}
+  stores=lp('sg_stores',JSON.parse(JSON.stringify(DS)));
+  closedIds=new Set(lp('sg_closed',[]));
+  routeStops=lp('sg_route',[]).filter(r=>r.idx<stores.length);
+  drivers=lp('sg_drivers',[{name:'Driver A',contact:''},{name:'Driver B',contact:''},{name:'Driver C',contact:''}]);
+  vehicles=lp('sg_vehicles',[]);
+  goods=lp('sg_goods',[]);
+}
+
+// ── MAP ──────────────────────────────────────────────────────────────────────
+const map=L.map('map').setView([1.352,103.820],11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+
+function makeIcon(b,num,closed){
+  const c=closed?'#bbb':bc(b);
+  if(num){
+    const isA=b==='Ad-hoc';
+    const bg=isA?'#c47d10':c;
+    return L.divIcon({html:`<svg xmlns="http://www.w3.org/2000/svg" width="26" height="32" viewBox="0 0 26 32"><path d="M13 0C5.82 0 0 5.82 0 13c0 9.1 13 19 13 19s13-9.9 13-19C26 5.82 20.18 0 13 0z" fill="${bg}"/><text x="13" y="18" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff" font-family="monospace">${num}</text></svg>`,className:'',iconSize:[26,32],iconAnchor:[13,32],popupAnchor:[0,-32]});
+  }
+  return L.divIcon({html:`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="18" viewBox="0 0 14 18"><path d="M7 0C3.134 0 0 3.134 0 7c0 4.9 7 11 7 11s7-6.1 7-11C14 3.134 10.866 0 7 0z" fill="${c}"/><circle cx="7" cy="7" r="2.5" fill="rgba(255,255,255,0.75)"/></svg>`,className:'',iconSize:[14,18],iconAnchor:[7,18],popupAnchor:[0,-18]});
+}
+
+function renderMapMarkers(){
+  mapMarkers.forEach(m=>map.removeLayer(m.marker));
+  mapMarkers=[];
+  const ridxs=routeStops.map(s=>s.idx);
+  const hideU=document.getElementById('hide-unsel').checked;
+  const routeOnlyEl=document.getElementById('route-only-map');
+  const routeOnly=routeOnlyEl?routeOnlyEl.checked:false;
+  stores.forEach((s,i)=>{
+    const isCl=closedIds.has(i);
+    if(isCl&&!showClosed)return;
+    const ri=ridxs.indexOf(i);
+    if(hideU&&ri<0)return;
+    if(routeOnly&&ri<0)return;
+    const icon=makeIcon(s.b,ri>=0?ri+1:null,isCl);
+    const m=L.marker([s.lat,s.lng],{icon}).addTo(map);
+    const c=bc(s.b);
+    const inR=ri>=0;
+    m.bindPopup(`<b style="font-size:12px;">${s.n}</b>${isCl?'<br><span style="color:#b83232;font-size:10px;">● Closed</span>':''}<br><span style="color:${c};font-size:10px;font-family:monospace;">${s.b}</span><br><small style="color:#888;">${s.a||''}</small><br><div style="display:flex;gap:4px;margin-top:5px;flex-wrap:wrap;">
+      <button onclick="addToRoute(${i})" style="font-size:11px;padding:2px 7px;border-radius:3px;border:1px solid ${c};color:${inR?'#fff':c};background:${inR?c:'transparent'};cursor:pointer;">${inR?'✓ In route':'+ Route'}</button>
+      <button onclick="toggleClosed(${i})" style="font-size:11px;padding:2px 7px;border-radius:3px;border:1px solid #b83232;color:${isCl?'#fff':'#b83232'};background:${isCl?'#b83232':'transparent'};cursor:pointer;">${isCl?'Reopen':'Close'}</button>
+      <button onclick="openEditModal(${i})" style="font-size:11px;padding:2px 7px;border-radius:3px;border:1px solid #888;color:#555;background:transparent;cursor:pointer;">Edit</button>
+    </div>`);
+    mapMarkers.push({marker:m,idx:i});
+  });
+}
+
+// REAL ROAD ROUTING via OSRM
+async function drawRoute(){
+  routePolylines.forEach(p=>map.removeLayer(p));
+  routePolylines=[];
+  if(!document.getElementById('show-line').checked)return;
+  if(routeStops.length<2)return;
+  const coords=routeStops.map(s=>s.lng+','+s.lat).join(';');
+  try{
+    const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false`);
+    const data=await r.json();
+    if(data.routes&&data.routes[0]){
+      const geom=data.routes[0].geometry;
+      const poly=L.geoJSON(geom,{style:{color:'#1a4d8f',weight:4,opacity:.75}}).addTo(map);
+      routePolylines.push(poly);
+      // update ETA from OSRM duration
+      const durSec=data.routes[0].duration;
+      updateETAFromOSRM(durSec);
+    }
+  }catch(e){
+    // fallback to straight dashed line
+    const poly=L.polyline(routeStops.map(s=>[s.lat,s.lng]),{color:'#1a4d8f',weight:2.5,opacity:.6,dashArray:'6,5'}).addTo(map);
+    routePolylines.push(poly);
+    recalcETA();
+  }
+}
+
+// ── ETA / TIMING ─────────────────────────────────────────────────────────────
+function addMins(timeStr,mins){
+  const[h,m]=timeStr.split(':').map(Number);
+  const tot=h*60+m+mins;
+  return String(Math.floor(tot/60)%24).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');
+}
+function minsBetween(t1,t2){
+  const[h1,m1]=t1.split(':').map(Number);
+  const[h2,m2]=t2.split(':').map(Number);
+  return(h2*60+m2)-(h1*60+m1);
+}
+function recalcETA(){
+  if(!routeStops.length){document.getElementById('route-eta-summary').textContent='-';return;}
+  let t=document.getElementById('start-time').value||'08:00';
+  let totalDur=0;
+  routeStops.forEach(s=>{totalDur+=(s.dur||15);});
+  // rough 25 min travel between stops average
+  const travelEst=(routeStops.length-1)*25;
+  totalDur+=travelEst;
+  const end=addMins(t,totalDur);
+  document.getElementById('route-eta-summary').textContent=`Est. finish ~${end}`;
+}
+function updateETAFromOSRM(driveSecs){
+  let t=document.getElementById('start-time').value||'08:00';
+  let stopDur=routeStops.reduce((a,s)=>a+(s.dur||15),0);
+  const totalMins=Math.round(driveSecs/60)+stopDur;
+  const end=addMins(t,totalMins);
+  const driveH=Math.floor(driveSecs/3600);
+  const driveM=Math.round((driveSecs%3600)/60);
+  document.getElementById('route-eta-summary').textContent=`Drive ${driveH}h${driveM}m + ${stopDur}min stops → ~${end}`;
+}
+
+// ── CAPACITY CHECK ───────────────────────────────────────────────────────────
+function checkCapacity(){
+  const vIdx=document.getElementById('start-vehicle').value;
+  const warn=document.getElementById('capacity-warn');
+  if(!vIdx||!vehicles[vIdx]){warn.style.display='none';return;}
+  const v=vehicles[vIdx];
+  if(!v.h||!v.l||!v.w){warn.style.display='none';return;}
+  const vVol=v.h*v.l*v.w;
+  // sum goods assigned to route stops
+  let gVol=0;
+  routeStops.forEach(s=>{
+    (s.goods||[]).forEach(g=>{
+      if(goods[g.idx]){const gd=goods[g.idx];gVol+=gd.h*gd.l*gd.w*(g.qty||1);}
+    });
+  });
+  if(gVol===0){warn.style.display='none';return;}
+  const pct=Math.round(gVol/vVol*100);
+  if(pct>100){
+    warn.style.display='block';
+    warn.textContent=`⚠ Goods volume (${gVol.toLocaleString()} cm³) exceeds vehicle capacity (${vVol.toLocaleString()} cm³) by ${pct-100}%. Consider splitting into multiple trips.`;
+    warn.style.background='#fff0f0';warn.style.borderTopColor='#e0a0a0';warn.style.color='#9a0000';
+  }else{
+    warn.style.display='block';
+    warn.textContent=`✓ Goods fit in vehicle: ${pct}% capacity used (${gVol.toLocaleString()} / ${vVol.toLocaleString()} cm³).`;
+    warn.style.background='#f0fff4';warn.style.borderTopColor='#7ec8a0';warn.style.color='#0a5a2a';
+  }
+}
+
+// ── POPULATE SELECTS ──────────────────────────────────────────────────────────
+function populateDriverVehicleSelects(){
+  const dSel=document.getElementById('start-driver');
+  const vSel=document.getElementById('start-vehicle');
+  const dv=dSel.value,vv=vSel.value;
+  dSel.innerHTML='<option value="">— Driver —</option>';
+  drivers.forEach((d,i)=>{const o=document.createElement('option');o.value=i;o.textContent=d.name;dSel.appendChild(o);});
+  vSel.innerHTML='<option value="">— Vehicle —</option>';
+  vehicles.forEach((v,i)=>{const o=document.createElement('option');o.value=i;o.textContent=v.name+(v.h?` (${v.h}×${v.l}×${v.w}cm)`:'');vSel.appendChild(o);});
+  dSel.value=dv;vSel.value=vv;
+}
+
+// ── SIDEBAR ──────────────────────────────────────────────────────────────────
+function toggleSB(side){
+  document.getElementById(side==='left'?'left-sb':'right-sb').classList.toggle('collapsed');
+  setTimeout(()=>map.invalidateSize(),210);
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(t){
+  ['route','drivers','goods'].forEach(id=>{
+    document.getElementById('tab-'+id).classList.toggle('active',id===t);
+    document.getElementById('pane-'+id).classList.toggle('active',id===t);
+  });
+}
+function openTab(t){switchTab(t);}
+
+// ── FILTER / LIST ─────────────────────────────────────────────────────────────
+function buildFilters(){
+  const row=document.getElementById('filter-row');
+  row.innerHTML='';
+  ['all',...Object.keys(BRANDS)].forEach(b=>{
+    const c=b==='all'?'#444':bc(b);
+    const btn=document.createElement('button');
+    btn.className='fbtn';
+    btn.textContent=b==='all'?'All':b;
+    btn.style.cssText=`border-color:${c};color:${currentFilter===b?'#fff':c};background:${currentFilter===b?c:'transparent'};`;
+    btn.onclick=()=>{currentFilter=b;buildFilters();renderList();};
+    row.appendChild(btn);
+  });
+}
+function renderList(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const hideU=document.getElementById('hide-unsel').checked;
+  const hideCl=document.getElementById('hide-closed-list').checked;
+  const ridxs=routeStops.map(s=>s.idx);
+  const list=document.getElementById('store-list');
+  list.innerHTML='';
+  stores.forEach((s,i)=>{
+    const isCl=closedIds.has(i);
+    if(isCl&&(hideCl||!showClosed))return;
+    if(currentFilter!=='all'&&s.b!==currentFilter)return;
+    if(q&&!s.n.toLowerCase().includes(q)&&!s.b.toLowerCase().includes(q)&&!(s.a||'').toLowerCase().includes(q))return;
+    const inR=ridxs.includes(i);
+    if(hideU&&!inR)return;
+    const c=bc(s.b);
+    const div=document.createElement('div');
+    div.className='sitem'+(isCl?' is-closed':'');
+    div.innerHTML=`<span class="bdot" style="background:${isCl?'#ccc':c};"></span>
+      <div class="sitem-name">
+        <div class="sname">${s.n}${isCl?'<span class="tag tag-closed">CLOSED</span>':''}${s.b==='Ad-hoc'?'<span class="tag tag-adhoc">AD-HOC</span>':''}</div>
+        <div class="sbrand" style="color:${c};">${s.b}</div>
+      </div>
+      <div class="sacts">
+        <button class="sact ${inR?'on-route':''}" onclick="addToRoute(${i})">${inR?'✓':'+'}</button>
+        <button class="sact ${isCl?'is-cl':''}" onclick="toggleClosed(${i})">✕</button>
+        <button class="sact" onclick="openEditModal(${i})">✎</button>
+      </div>`;
+    div.querySelector('.sname').addEventListener('click',()=>{map.setView([s.lat,s.lng],16);const m=mapMarkers.find(x=>x.idx===i);if(m)m.marker.openPopup();});
+    list.appendChild(div);
+  });
+}
+
+// ── ROUTE ────────────────────────────────────────────────────────────────────
+function addToRoute(idx){
+  if(closedIds.has(idx)){toast('Store is marked as closed');return;}
+  const s=stores[idx];
+  const ei=routeStops.findIndex(r=>r.idx===idx);
+  if(ei>=0)routeStops.splice(ei,1);
+  else routeStops.push({idx,n:s.n,b:s.b,lat:s.lat,lng:s.lng,a:s.a||'',dur:s.dur||15,adhocNote:s.adhocNote||'',goods:[]});
+  save();renderRoute();renderMapMarkers();drawRoute();renderList();
+}
+function moveStop(pos,dir){
+  const np=pos+dir;if(np<0||np>=routeStops.length)return;
+  [routeStops[pos],routeStops[np]]=[routeStops[np],routeStops[pos]];
+  save();renderRoute();renderMapMarkers();drawRoute();
+}
+function removeStop(idx){routeStops=routeStops.filter(r=>r.idx!==idx);save();renderRoute();renderMapMarkers();drawRoute();renderList();}
+function updateDur(pos,val){routeStops[pos].dur=parseInt(val)||15;save();recalcETA();}
+
+function renderRoute(){
+  document.getElementById('stop-count').textContent=routeStops.length;
+  const el=document.getElementById('route-stops');
+  if(!routeStops.length){el.innerHTML='<div class="route-empty">Click + on any store<br>to add to route.<br><br>Assign a driver &amp; vehicle,<br>then use AI to optimise.</div>';recalcETA();return;}
+  el.innerHTML='';
+  let t=document.getElementById('start-time').value||'08:00';
+  routeStops.forEach((s,i)=>{
+    const eta=t;
+    t=addMins(t,(s.dur||15)+25);
+    const isA=s.b==='Ad-hoc';
+    const gCount=(s.goods||[]).reduce((a,g)=>a+(g.qty||1),0);
+    const div=document.createElement('div');
+    div.className='rstop';
+    div.innerHTML=`<div class="rnum ${isA?'adhoc':''}">${i+1}</div>
+      <div class="rtext">
+        <div class="rname">${s.n}</div>
+        <div class="rbrand" style="color:${bc(s.b)};">${s.b}${s.adhocNote?'<br><span style="color:#c47d10;">📋 '+s.adhocNote+'</span>':''}</div>
+        <div class="stop-timing">⏰ ~${eta} · <input type="number" value="${s.dur||15}" min="1" max="240" onchange="updateDur(${i},this.value)" style="width:36px;font-size:10px;padding:1px 2px;"/> min${gCount?' · 📦 '+gCount+' items':''}</div>
+        <div style="margin-top:2px;"><button onclick="openGoodsAssign(${i})" style="font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid #ccc;background:transparent;cursor:pointer;color:#888;">Assign goods</button></div>
+      </div>
+      <div class="rctrl">
+        <button class="rcbtn" onclick="moveStop(${i},-1)">▲</button>
+        <button class="rcbtn del" onclick="removeStop(${s.idx})">✕</button>
+        <button class="rcbtn" onclick="moveStop(${i},1)">▼</button>
+      </div>`;
+    el.appendChild(div);
+  });
+  recalcETA();checkCapacity();
+}
+function clearRoute(){if(!routeStops.length)return;if(!confirm('Clear route?'))return;routeStops=[];save();renderRoute();renderMapMarkers();drawRoute();renderList();}
+
+// ── DRIVERS / VEHICLES / GOODS PANELS ────────────────────────────────────────
+function renderDrivers(){
+  const el=document.getElementById('driver-list');
+  el.innerHTML='';
+  drivers.forEach((d,i)=>{
+    const div=document.createElement('div');
+    div.className='dv-item';
+    div.innerHTML=`<div class="dv-acts"><button class="sact" onclick="openDriverModal(${i})">✎</button></div><h4>👤 ${d.name}</h4><p>${d.contact||'No contact'}</p>`;
+    el.appendChild(div);
+  });
+}
+function renderVehicles(){
+  const el=document.getElementById('vehicle-list');
+  el.innerHTML='';
+  vehicles.forEach((v,i)=>{
+    const vol=v.h&&v.l&&v.w?`${(v.h*v.l*v.w).toLocaleString()} cm³`:'No dims';
+    const div=document.createElement('div');
+    div.className='dv-item';
+    div.innerHTML=`<div class="dv-acts"><button class="sact" onclick="openVehicleModal(${i})">✎</button></div><h4>🚛 ${v.name}</h4><p>${v.type} · ${v.h?v.h+'×'+v.l+'×'+v.w+' cm':''} · Vol: ${vol}</p>${v.notes?`<p style="margin-top:2px;">${v.notes}</p>`:''}`;
+    el.appendChild(div);
+  });
+}
+function renderGoods(){
+  const el=document.getElementById('goods-list');
+  el.innerHTML='';
+  goods.forEach((g,i)=>{
+    const vol=g.h&&g.l&&g.w?`${(g.h*g.l*g.w).toLocaleString()} cm³`:'No dims';
+    const div=document.createElement('div');
+    div.className='goods-item';
+    div.innerHTML=`<div class="dv-acts"><button class="sact" onclick="openGoodsModal(${i})">✎</button></div><h4>📦 ${g.name}</h4><p>${g.h?g.h+'×'+g.l+'×'+g.w+' cm · ':''} Vol: ${vol} · Qty: ${g.qty||1}</p>${g.notes?`<p>${g.notes}</p>`:''}`;
+    el.appendChild(div);
+  });
+}
+
+// ── GOODS ASSIGN ──────────────────────────────────────────────────────────────
+function openGoodsAssign(stopPos){
+  assignStopIdx=stopPos;
+  const s=routeStops[stopPos];
+  document.getElementById('ga-title').textContent='Assign Goods — '+s.n;
+  const body=document.getElementById('ga-body');
+  if(!goods.length){body.innerHTML='<p style="font-size:12px;color:var(--muted);">No goods defined yet. Go to the Goods tab to add items.</p>';document.getElementById('goods-assign-modal').classList.add('open');return;}
+  body.innerHTML='';
+  goods.forEach((g,gi)=>{
+    const existing=(s.goods||[]).find(x=>x.idx===gi);
+    const qty=existing?existing.qty:0;
+    const div=document.createElement('div');
+    div.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);';
+    div.innerHTML=`<div style="flex:1;font-size:12px;"><b>${g.name}</b><br><span style="font-size:10px;color:var(--muted);">${g.h?g.h+'×'+g.l+'×'+g.w+' cm':''} ${g.notes?'· '+g.notes:''}</span></div>
+      <label style="font-size:11px;color:var(--muted);">Qty:</label>
+      <input type="number" id="ga-qty-${gi}" value="${qty}" min="0" style="width:50px;font-size:12px;"/>`;
+    body.appendChild(div);
+  });
+  document.getElementById('goods-assign-modal').classList.add('open');
+}
+function saveGoodsAssign(){
+  if(assignStopIdx===null)return;
+  const s=routeStops[assignStopIdx];
+  s.goods=[];
+  goods.forEach((g,gi)=>{
+    const qty=parseInt(document.getElementById('ga-qty-'+gi).value)||0;
+    if(qty>0)s.goods.push({idx:gi,qty});
+  });
+  save();renderRoute();checkCapacity();closeModal('goods-assign-modal');toast('Goods assigned!');
+}
+
+// ── CLOSED ───────────────────────────────────────────────────────────────────
+function toggleClosed(idx){
+  if(closedIds.has(idx)){closedIds.delete(idx);}
+  else{closedIds.add(idx);routeStops=routeStops.filter(r=>r.idx!==idx);renderRoute();}
+  save();renderMapMarkers();drawRoute();renderList();toast(closedIds.has(idx)?'Marked closed':'Marked open');
+}
+function toggleShowClosed(){
+  showClosed=!showClosed;
+  document.getElementById('show-closed-btn').classList.toggle('active',showClosed);
+  document.getElementById('show-closed-btn').textContent=showClosed?'Hide Closed':'Show Closed';
+  renderList();renderMapMarkers();drawRoute();
+}
+
+// ── EXPORT ───────────────────────────────────────────────────────────────────
+function exportGoogleMaps(){
+  if(!routeStops.length){toast('No stops');return;}
+  if(routeStops.length===1){window.open(`https://www.google.com/maps/search/?api=1&query=${routeStops[0].lat},${routeStops[0].lng}`,'_blank');return;}
+  const o=routeStops[0],d=routeStops[routeStops.length-1];
+  const wp=routeStops.slice(1,-1).map(s=>`${s.lat},${s.lng}`).join('|');
+  let url=`https://www.google.com/maps/dir/?api=1&origin=${o.lat},${o.lng}&destination=${d.lat},${d.lng}&travelmode=driving`;
+  if(wp)url+=`&waypoints=${encodeURIComponent(wp)}`;
+  window.open(url,'_blank');
+}
+function exportWaze(){
+  if(!routeStops.length){toast('No stops');return;}
+  window.open(`https://waze.com/ul?ll=${routeStops[0].lat},${routeStops[0].lng}&navigate=yes`,'_blank');
+  if(routeStops.length>1)toast('Waze: opening stop 1. Use Google Maps for multi-stop.');
+}
+function copyStops(){
+  if(!routeStops.length){toast('No stops');return;}
+  const t=document.getElementById('start-time').value||'08:00';
+  let cur=t;
+  const txt=routeStops.map((s,i)=>{const eta=cur;cur=addMins(cur,(s.dur||15)+25);return`${i+1}. ${s.n} (${s.b})\n   ${s.a||''}\n   ETA ~${eta} · Stop ${s.dur||15}min${s.adhocNote?'\n   Task: '+s.adhocNote:''}`;}).join('\n\n');
+  navigator.clipboard.writeText(txt).then(()=>toast('Copied!')).catch(()=>{prompt('Copy:',txt);});
+}
+
+// ── POSTAL GEOCODE ───────────────────────────────────────────────────────────
+function onPostalInput(){
+  clearTimeout(postalTimer);
+  const v=document.getElementById('m-postal').value.trim();
+  document.getElementById('postal-err').style.display='none';
+  document.getElementById('postal-ok').style.display='none';
+  if(v.length===6&&/^\d{6}$/.test(v))postalTimer=setTimeout(()=>lookupPostal(v),700);
+}
+async function lookupPostal(p){
+  const err=document.getElementById('postal-err'),ok=document.getElementById('postal-ok');
+  ok.textContent='Looking up…';ok.style.display='block';
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${p}+Singapore&format=json&limit=1`,{headers:{'Accept-Language':'en'}});
+    const d=await r.json();
+    if(d&&d.length){
+      document.getElementById('m-lat').value=parseFloat(d[0].lat).toFixed(6);
+      document.getElementById('m-lng').value=parseFloat(d[0].lon).toFixed(6);
+      if(!document.getElementById('m-addr').value)document.getElementById('m-addr').value=d[0].display_name.split(',').slice(0,3).join(', ');
+      ok.textContent='✓ '+d[0].display_name.split(',').slice(0,2).join(',');ok.style.display='block';err.style.display='none';
+    }else{err.textContent='Postal code not found.';err.style.display='block';ok.style.display='none';}
+  }catch(e){err.textContent='Network error — enter address manually.';err.style.display='block';ok.style.display='none';}
+}
+
+// ── BRAND ────────────────────────────────────────────────────────────────────
+function populateBrandSelect(){
+  const sel=document.getElementById('m-brand');
+  sel.innerHTML='';
+  Object.keys(BRANDS).forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;sel.appendChild(o);});
+  const o=document.createElement('option');o.value='__new__';o.textContent='＋ New brand…';sel.appendChild(o);
+}
+function onBrandChange(){document.getElementById('new-brand-wrap').style.display=document.getElementById('m-brand').value==='__new__'?'block':'none';}
+function addNewBrand(){
+  const name=document.getElementById('m-new-brand').value.trim(),color=document.getElementById('m-brand-color').value;
+  if(!name){toast('Enter brand name');return;}
+  if(BRANDS[name]){toast('Already exists');return;}
+  BRANDS[name]=color;saveBrands();buildFilters();populateBrandSelect();
+  document.getElementById('m-brand').value=name;document.getElementById('new-brand-wrap').style.display='none';
+  document.getElementById('m-new-brand').value='';toast('Brand "'+name+'" added!');
+}
+
+// ── STORE MODAL ──────────────────────────────────────────────────────────────
+function openAddModal(adhoc){
+  isAdhoc=adhoc;editIdx=null;
+  document.getElementById('modal-title').textContent=adhoc?'Add Ad-hoc Stop':'Add New Store';
+  document.getElementById('adhoc-row').style.display=adhoc?'block':'none';
+  document.getElementById('brand-row').style.display=adhoc?'none':'block';
+  document.getElementById('del-row').style.display='none';
+  ['m-name','m-adhoc','m-postal','m-addr','m-lat','m-lng'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('m-dur').value=15;
+  document.getElementById('postal-err').style.display='none';
+  document.getElementById('postal-ok').style.display='none';
+  document.getElementById('addr-err').style.display='none';
+  document.getElementById('new-brand-wrap').style.display='none';
+  populateBrandSelect();
+  document.getElementById('store-modal').classList.add('open');
+}
+function openEditModal(idx){
+  editIdx=idx;isAdhoc=false;
+  const s=stores[idx];
+  document.getElementById('modal-title').textContent='Edit Store';
+  document.getElementById('adhoc-row').style.display=s.b==='Ad-hoc'?'block':'none';
+  document.getElementById('brand-row').style.display='block';
+  document.getElementById('del-row').style.display='block';
+  document.getElementById('new-brand-wrap').style.display='none';
+  document.getElementById('m-name').value=s.n;
+  document.getElementById('m-adhoc').value=s.adhocNote||'';
+  document.getElementById('m-postal').value=s.postal||'';
+  document.getElementById('m-addr').value=s.a||'';
+  document.getElementById('m-lat').value=s.lat;
+  document.getElementById('m-lng').value=s.lng;
+  document.getElementById('m-dur').value=s.dur||15;
+  document.getElementById('postal-err').style.display='none';
+  document.getElementById('postal-ok').style.display='none';
+  document.getElementById('addr-err').style.display='none';
+  populateBrandSelect();
+  document.getElementById('m-brand').value=s.b;
+  map.closePopup();
+  document.getElementById('store-modal').classList.add('open');
+}
+async function saveStore(){
+  const name=document.getElementById('m-name').value.trim();
+  const brand=isAdhoc?'Ad-hoc':document.getElementById('m-brand').value;
+  const postal=document.getElementById('m-postal').value.trim();
+  const addr=document.getElementById('m-addr').value.trim();
+  const adhocNote=document.getElementById('m-adhoc').value.trim();
+  const dur=parseInt(document.getElementById('m-dur').value)||15;
+  let valid=true;
+  if(!name){toast('Name required');return;}
+  if(!postal||!/^\d{6}$/.test(postal)){document.getElementById('postal-err').textContent='6-digit postal code required.';document.getElementById('postal-err').style.display='block';valid=false;}
+  else document.getElementById('postal-err').style.display='none';
+  if(!addr){document.getElementById('addr-err').style.display='block';valid=false;}
+  else document.getElementById('addr-err').style.display='none';
+  if(!valid)return;
+  let lat=parseFloat(document.getElementById('m-lat').value),lng=parseFloat(document.getElementById('m-lng').value);
+  if(isNaN(lat)||isNaN(lng)){
+    const btn=document.getElementById('save-store-btn');btn.disabled=true;btn.textContent='Looking up…';
+    try{const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr+' Singapore')}&format=json&limit=1`);const d=await r.json();if(d&&d.length){lat=parseFloat(d[0].lat);lng=parseFloat(d[0].lon);}else{toast('Cannot geocode. Check address.');btn.disabled=false;btn.textContent='Save';return;}}
+    catch(e){toast('Network error.');btn.disabled=false;btn.textContent='Save';return;}
+    btn.disabled=false;btn.textContent='Save';
+  }
+  const entry={b:brand,n:name,a:addr,postal,lat,lng,dur};
+  if(adhocNote)entry.adhocNote=adhocNote;
+  if(editIdx!==null){stores[editIdx]=entry;routeStops=routeStops.map(r=>r.idx===editIdx?{...r,...entry}:r);toast('Updated');}
+  else{stores.push(entry);toast(isAdhoc?'Ad-hoc added':'Store added');}
+  save();closeModal('store-modal');buildFilters();renderList();renderMapMarkers();drawRoute();renderRoute();
+}
+function deleteStore(){
+  if(editIdx===null)return;
+  if(!confirm('Delete "'+stores[editIdx].n+'"?'))return;
+  routeStops=routeStops.filter(r=>r.idx!==editIdx).map(r=>({...r,idx:r.idx>editIdx?r.idx-1:r.idx}));
+  const nc=new Set();closedIds.forEach(id=>nc.add(id>editIdx?id-1:id));closedIds=nc;
+  stores.splice(editIdx,1);save();closeModal('store-modal');buildFilters();renderList();renderMapMarkers();drawRoute();renderRoute();toast('Deleted');
+}
+function openDriverModal(idx){
+  editDriverIdx=idx===undefined?null:idx;
+  document.getElementById('driver-modal-title').textContent=editDriverIdx===null?'Add Driver':'Edit Driver';
+  document.getElementById('d-name').value=editDriverIdx!==null?drivers[editDriverIdx].name:'';
+  document.getElementById('d-contact').value=editDriverIdx!==null?drivers[editDriverIdx].contact:'';
+  document.getElementById('d-del-row').style.display=editDriverIdx!==null?'block':'none';
+  document.getElementById('driver-modal').classList.add('open');
+}
+function saveDriver(){
+  const name=document.getElementById('d-name').value.trim();
+  if(!name){toast('Name required');return;}
+  const entry={name,contact:document.getElementById('d-contact').value.trim()};
+  if(editDriverIdx!==null)drivers[editDriverIdx]=entry;else drivers.push(entry);
+  save();closeModal('driver-modal');renderDrivers();populateDriverVehicleSelects();toast('Saved');
+}
+function deleteDriver(){
+  if(editDriverIdx===null)return;
+  if(!confirm('Delete driver?'))return;
+  drivers.splice(editDriverIdx,1);save();closeModal('driver-modal');renderDrivers();populateDriverVehicleSelects();toast('Deleted');
+}
+function openVehicleModal(idx){
+  editVehicleIdx=idx===undefined?null:idx;
+  document.getElementById('vehicle-modal-title').textContent=editVehicleIdx===null?'Add Vehicle':'Edit Vehicle';
+  const v=editVehicleIdx!==null?vehicles[editVehicleIdx]:{};
+  document.getElementById('v-name').value=v.name||'';
+  document.getElementById('v-type').value=v.type||'Lorry';
+  document.getElementById('v-h').value=v.h||'';
+  document.getElementById('v-l').value=v.l||'';
+  document.getElementById('v-w').value=v.w||'';
+  document.getElementById('v-notes').value=v.notes||'';
+  document.getElementById('v-del-row').style.display=editVehicleIdx!==null?'block':'none';
+  document.getElementById('vehicle-modal').classList.add('open');
+}
+function saveVehicle(){
+  const name=document.getElementById('v-name').value.trim();
+  if(!name){toast('Name required');return;}
+  const entry={name,type:document.getElementById('v-type').value,h:parseInt(document.getElementById('v-h').value)||0,l:parseInt(document.getElementById('v-l').value)||0,w:parseInt(document.getElementById('v-w').value)||0,notes:document.getElementById('v-notes').value.trim()};
+  if(editVehicleIdx!==null)vehicles[editVehicleIdx]=entry;else vehicles.push(entry);
+  save();closeModal('vehicle-modal');renderVehicles();populateDriverVehicleSelects();toast('Saved');
+}
+function deleteVehicle(){
+  if(editVehicleIdx===null)return;
+  if(!confirm('Delete vehicle?'))return;
+  vehicles.splice(editVehicleIdx,1);save();closeModal('vehicle-modal');renderVehicles();populateDriverVehicleSelects();toast('Deleted');
+}
+function openGoodsModal(idx){
+  editGoodsIdx=idx===undefined?null:idx;
+  document.getElementById('goods-modal-title').textContent=editGoodsIdx===null?'Add Goods':'Edit Goods';
+  const g=editGoodsIdx!==null?goods[editGoodsIdx]:{};
+  document.getElementById('g-name').value=g.name||'';
+  document.getElementById('g-h').value=g.h||'';
+  document.getElementById('g-l').value=g.l||'';
+  document.getElementById('g-w').value=g.w||'';
+  document.getElementById('g-qty').value=g.qty||1;
+  document.getElementById('g-notes').value=g.notes||'';
+  document.getElementById('g-del-row').style.display=editGoodsIdx!==null?'block':'none';
+  document.getElementById('goods-modal').classList.add('open');
+}
+function saveGoods(){
+  const name=document.getElementById('g-name').value.trim();
+  if(!name){toast('Name required');return;}
+  const entry={name,h:parseInt(document.getElementById('g-h').value)||0,l:parseInt(document.getElementById('g-l').value)||0,w:parseInt(document.getElementById('g-w').value)||0,qty:parseInt(document.getElementById('g-qty').value)||1,notes:document.getElementById('g-notes').value.trim()};
+  if(editGoodsIdx!==null)goods[editGoodsIdx]=entry;else goods.push(entry);
+  save();closeModal('goods-modal');renderGoods();toast('Saved');
+}
+function deleteGoods(){
+  if(editGoodsIdx===null)return;
+  if(!confirm('Delete goods?'))return;
+  goods.splice(editGoodsIdx,1);save();closeModal('goods-modal');renderGoods();toast('Deleted');
+}
+function openAIModal(){
+  if(routeStops.length<2){toast('Add at least 2 stops first');return;}
+  document.getElementById('ai-modal').classList.add('open');
+}
+function applyAIOrder(orderArr){
+  if(!orderArr||!orderArr.length)return;
+  const nr=[];
+  orderArr.forEach(n=>{const idx=n-1;if(idx>=0&&idx<routeStops.length)nr.push(routeStops[idx]);});
+  if(nr.length===routeStops.length){routeStops=nr;save();renderRoute();renderMapMarkers();drawRoute();renderList();toast('Route order applied!');closeModal('ai-modal');}
+  else toast('Could not fully apply — adjust manually');
+}
+function copyAIPrompt(){
+  const constraint=document.getElementById('ai-adjust').value.trim();
+  const startPt=document.getElementById('ai-start').value.trim();
+  const vIdx=document.getElementById('start-vehicle').value;
+  const dIdx=document.getElementById('start-driver').value;
+  const driverName=dIdx!==''&&drivers[dIdx]?drivers[dIdx].name:'unspecified';
+  const vehName=vIdx!==''&&vehicles[vIdx]?vehicles[vIdx].name+' ('+vehicles[vIdx].h+'x'+vehicles[vIdx].l+'x'+vehicles[vIdx].w+'cm)':'unspecified';
+  const startTime=document.getElementById('start-time').value||'08:00';
+  const stopList=routeStops.map((s,i)=>`${i+1}. ${s.n} (${s.b}) — lat ${s.lat.toFixed(4)}, lng ${s.lng.toFixed(4)}, stop_time ${s.dur||15}min${s.adhocNote?' [Task: '+s.adhocNote+']':''}`).join('\n');
+  const goodsSummary=routeStops.map((s,i)=>{
+    const g=(s.goods||[]).map(g=>goods[g.idx]?`${goods[g.idx].name} x${g.qty}`:null).filter(Boolean);
+    return g.length?`Stop ${i+1} (${s.n}): ${g.join(', ')}`:null;
+  }).filter(Boolean).join('\n');
+  const prompt=`You are a Singapore delivery route planner. Reply ONLY with your analysis and end with SUGGESTED_ORDER.
+
+Driver: ${driverName}
+Vehicle: ${vehName}
+Start time: ${startTime}
+${startPt?'Mandatory first stop: '+startPt:''}
+${constraint?'Constraints: '+constraint:''}
+
+Current stops (in current order):
+${stopList}
+${goodsSummary?'\nGoods per stop:\n'+goodsSummary:''}
+
+Please:
+1. Suggest the most efficient DRIVING order to minimise total travel time, grouping nearby areas (East, Central, West, North, Northeast, CBD).
+2. For each stop in the new order: show arrival time estimate (from ${startTime}), time at stop, and which expressway/major road leads to the next stop.
+3. Note key expressways used overall (PIE, CTE, TPE, ECP, AYE, KJE, BKE, SLE, MCE).
+4. Give estimated total drive time, total stop time, and estimated finish time.
+5. If a mandatory first stop is given, it must come first.
+6. End your response with EXACTLY this line (nothing after it):
+SUGGESTED_ORDER: 3,1,5,2,4
+(replace with the actual original stop numbers in new order, comma-separated, no spaces)`;
+  navigator.clipboard.writeText(prompt).then(()=>{
+    document.getElementById('copy-confirm').style.display='block';
+  }).catch(()=>{
+    // fallback
+    const ta=document.createElement('textarea');ta.value=prompt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    document.getElementById('copy-confirm').style.display='block';
+  });
+}
+
+function applyPastedAI(){
+  const raw=document.getElementById('ai-response-paste').value.trim();
+  const resultEl=document.getElementById('apply-result');
+  if(!raw){toast('Paste Claude\'s response first');return;}
+  const m=raw.match(/SUGGESTED_ORDER:\s*([\d,\s]+)/);
+  if(!m){
+    resultEl.style.display='block';
+    resultEl.style.background='#fff0f0';resultEl.style.border='1px solid #f5a0a0';resultEl.style.color='#9a0000';
+    resultEl.textContent='Could not find SUGGESTED_ORDER in the pasted text. Make sure you copied Claude\'s full reply. It should end with a line like: SUGGESTED_ORDER: 2,4,1,3';
+    return;
+  }
+  const orderArr=m[1].split(',').map(n=>parseInt(n.trim())).filter(n=>!isNaN(n));
+  const nr=[];
+  orderArr.forEach(n=>{const idx=n-1;if(idx>=0&&idx<routeStops.length)nr.push(routeStops[idx]);});
+  if(nr.length!==routeStops.length){
+    resultEl.style.display='block';
+    resultEl.style.background='#fff8ee';resultEl.style.border='1px solid #f5d78e';resultEl.style.color='#a06000';
+    resultEl.textContent=`Order has ${nr.length} stops but route has ${routeStops.length}. Numbers may not match. Adjust manually using the ▲▼ buttons.`;
+    return;
+  }
+  routeStops=nr;save();renderRoute();renderMapMarkers();drawRoute();renderList();
+  closeModal('ai-modal');
+  toast('Route order applied from AI!');
+}
+
+
+function exportJSON(){
+  const data={stores,closedIds:[...closedIds],brands:BRANDS,drivers,vehicles,goods};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='sg_route_backup.json';a.click();toast('Backup downloaded!');
+}
+function importJSON(){
+  const input=document.createElement('input');input.type='file';input.accept='.json';
+  input.onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const d=JSON.parse(ev.target.result);
+        if(d.stores){stores=d.stores;closedIds=new Set(d.closedIds||[]);if(d.brands){BRANDS=d.brands;saveBrands();}drivers=d.drivers||drivers;vehicles=d.vehicles||[];goods=d.goods||[];routeStops=[];save();buildFilters();renderList();renderMapMarkers();renderRoute();renderDrivers();renderVehicles();renderGoods();populateDriverVehicleSelects();toast('Restored!');}
+        else alert('Invalid backup.');
+      }catch(e){alert('Cannot read file.');}
+    };
+    reader.readAsText(f);
+  };
+  input.click();
+}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+['store-modal','driver-modal','vehicle-modal','goods-modal','ai-modal','goods-assign-modal','summary-modal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){if(e.target===this)closeModal(id);});
+});
+function toast(msg,dur=2400){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
+loadBrands();load();buildFilters();renderList();renderMapMarkers();renderRoute();
+renderDrivers();renderVehicles();renderGoods();populateDriverVehicleSelects();
+document.getElementById('start-time').addEventListener('change',()=>{renderRoute();drawRoute();});
+
+function showRouteSummary(){
+  if(!routeStops.length){toast('No stops in route');return;}
+  document.getElementById('summary-modal').classList.add('open');
+  var body=document.getElementById('summary-body');
+  body.innerHTML='<span style="color:var(--muted);">Calculating...</span>';
+  var startTime=document.getElementById('start-time').value||'08:00';
+  var dIdx=document.getElementById('start-driver').value;
+  var vIdx=document.getElementById('start-vehicle').value;
+  var driverName=dIdx!==''&&drivers[dIdx]?drivers[dIdx].name:'Unassigned';
+  var vehName=vIdx!==''&&vehicles[vIdx]?vehicles[vIdx].name:'Unassigned';
+  var coords=routeStops.map(function(s){return s.lng+','+s.lat;}).join(';');
+  fetch('https://router.project-osrm.org/route/v1/driving/'+coords+'?overview=false&steps=false')
+  .then(function(r){return r.json();})
+  .then(function(data){
+    var driveSecs=0,driveKm=0;
+    if(data.routes&&data.routes[0]){
+      driveSecs=data.routes[0].duration;
+      driveKm=data.routes[0].distance/1000;
+    }
+    buildSummaryHTML(body,startTime,driverName,vehName,driveSecs,driveKm);
+  })
+  .catch(function(){
+    buildSummaryHTML(body,startTime,driverName,vehName,0,0);
+  });
+}
+
+function addMinsToTime(t,m){
+  var parts=t.split(':');
+  var total=parseInt(parts[0])*60+parseInt(parts[1])+m;
+  return String(Math.floor(total/60)%24).padStart(2,'0')+':'+String(total%60).padStart(2,'0');
+}
+
+function buildSummaryHTML(body,startTime,driverName,vehName,driveSecs,driveKm){
+  var stopMins=routeStops.reduce(function(a,s){return a+(s.dur||15);},0);
+  var driveH=Math.floor(driveSecs/3600);
+  var driveM=Math.round((driveSecs%3600)/60);
+  var totalMins=Math.round(driveSecs/60)+stopMins;
+  var finishTime=addMinsToTime(startTime,totalMins);
+  var avgDrive=routeStops.length>1?Math.round(driveSecs/60/(routeStops.length-1)):0;
+  var html='';
+  html+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px;">';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">';
+  html+='<div><div style="font-size:20px;font-weight:600;">'+driveH+'h '+driveM+'m</div><div style="font-size:10px;color:var(--muted);">Drive time</div></div>';
+  html+='<div><div style="font-size:20px;font-weight:600;">'+(driveKm>0?driveKm.toFixed(1):'?')+' km</div><div style="font-size:10px;color:var(--muted);">Distance</div></div>';
+  html+='<div><div style="font-size:20px;font-weight:600;">'+stopMins+' min</div><div style="font-size:10px;color:var(--muted);">Stop time</div></div>';
+  html+='</div>';
+  html+='<div style="margin-top:8px;text-align:center;font-size:12px;">Start <b>'+startTime+'</b> &rarr; Est. finish <b>'+finishTime+'</b> &middot; <b>'+routeStops.length+'</b> stops</div>';
+  html+='</div>';
+  html+='<div style="font-size:11px;margin-bottom:8px;"><b>Driver:</b> '+driverName+' &nbsp;&middot;&nbsp; <b>Vehicle:</b> '+vehName+'</div>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+  html+='<tr style="border-bottom:2px solid var(--border);font-weight:600;"><td style="padding:4px;">#</td><td style="padding:4px;">Stop</td><td style="padding:4px;text-align:center;">Arrive</td><td style="padding:4px;text-align:center;">Mins</td></tr>';
+  var t=startTime;
+  var summaryLines='Route Summary\n';
+  summaryLines+='Driver: '+driverName+' | Vehicle: '+vehName+'\n';
+  summaryLines+='Start: '+startTime+' | Finish: ~'+finishTime+'\n';
+  summaryLines+='Drive: '+driveH+'h '+driveM+'m | Distance: '+(driveKm>0?driveKm.toFixed(1)+'km':'unknown')+'\n';
+  summaryLines+='Stop time: '+stopMins+'min | Stops: '+routeStops.length+'\n\n';
+  for(var i=0;i<routeStops.length;i++){
+    var s=routeStops[i];
+    var col=bc(s.b);
+    html+='<tr style="border-bottom:1px solid var(--border);">';
+    html+='<td style="padding:4px;"><span style="background:'+col+';color:#fff;border-radius:3px;padding:1px 5px;font-family:monospace;font-size:10px;">'+(i+1)+'</span></td>';
+    html+='<td style="padding:4px;"><b>'+s.n+'</b><br><span style="font-size:10px;color:var(--muted);">'+(s.a||'')+'</span></td>';
+    html+='<td style="padding:4px;text-align:center;font-family:monospace;">'+t+'</td>';
+    html+='<td style="padding:4px;text-align:center;">'+(s.dur||15)+'</td>';
+    html+='</tr>';
+    summaryLines+=(i+1)+'. '+s.n+'\n   Arrive: '+t+' | Stop: '+(s.dur||15)+' min\n   '+(s.a||'')+'\n';
+    t=addMinsToTime(t,(s.dur||15)+(i<routeStops.length-1?avgDrive:0));
+  }
+  html+='</table>';
+  if(driveKm===0){
+    html+='<p style="font-size:10px;color:var(--muted);margin-top:8px;">Distance unavailable (no internet). Times are estimates only.</p>';
+  }
+  body.innerHTML=html;
+  window._lastSummaryText=summaryLines;
+}
+
+function copySummary(){
+  var txt=window._lastSummaryText||'No summary yet';
+  navigator.clipboard.writeText(txt).then(function(){toast('Copied!');}).catch(function(){prompt('Copy:',txt);});
+}
+</script>
+</body>
+</html>
