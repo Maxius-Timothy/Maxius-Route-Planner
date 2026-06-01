@@ -215,6 +215,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
         <div class="export-sec">
           <span class="lbl">Optimise &amp; Export</span>
           <button class="ebtn ai-btn" onclick="openAIModal()">&#10024; AI optimise route</button>
+          <button class="ebtn" onclick="showRouteSummary()">&#128203; Route summary &amp; ETA</button>
           <button class="ebtn" onclick="exportGoogleMaps()">&#9654; Google Maps</button>
           <button class="ebtn" onclick="exportWaze()">&#9670; Waze</button>
           <button class="ebtn" onclick="copyStops()">&#9741; Copy stop list</button>
@@ -368,6 +369,18 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   <h3 id="ga-title">Assign Goods to Stop</h3>
   <div id="ga-body"></div>
   <div class="mbtns"><button class="btn-c" onclick="closeModal('goods-assign-modal')">Close</button><button class="btn-p" onclick="saveGoodsAssign()">Save</button></div>
+</div></div>
+
+
+<!-- ROUTE SUMMARY MODAL -->
+<div class="modal-bg" id="summary-modal">
+<div class="modal" style="width:520px;">
+  <h3>&#128203; Route Summary</h3>
+  <div id="summary-body" style="font-size:12px;line-height:1.8;"></div>
+  <div class="mbtns" style="margin-top:10px;">
+    <button class="btn-c" onclick="closeModal('summary-modal')">Close</button>
+    <button class="btn-p" onclick="copySummary()">&#9741; Copy</button>
+  </div>
 </div></div>
 
 <div id="toast"></div>
@@ -1145,13 +1158,95 @@ function importJSON(){
   input.click();
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-['store-modal','driver-modal','vehicle-modal','goods-modal','ai-modal','goods-assign-modal'].forEach(id=>{
+['store-modal','driver-modal','vehicle-modal','goods-modal','ai-modal','goods-assign-modal','summary-modal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){if(e.target===this)closeModal(id);});
 });
 function toast(msg,dur=2400){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
 loadBrands();load();buildFilters();renderList();renderMapMarkers();renderRoute();
 renderDrivers();renderVehicles();renderGoods();populateDriverVehicleSelects();
 document.getElementById('start-time').addEventListener('change',()=>{renderRoute();drawRoute();});
+
+function showRouteSummary(){
+  if(!routeStops.length){toast('No stops in route');return;}
+  document.getElementById('summary-modal').classList.add('open');
+  var body=document.getElementById('summary-body');
+  body.innerHTML='<span style="color:var(--muted);">Calculating...</span>';
+  var startTime=document.getElementById('start-time').value||'08:00';
+  var dIdx=document.getElementById('start-driver').value;
+  var vIdx=document.getElementById('start-vehicle').value;
+  var driverName=dIdx!==''&&drivers[dIdx]?drivers[dIdx].name:'Unassigned';
+  var vehName=vIdx!==''&&vehicles[vIdx]?vehicles[vIdx].name:'Unassigned';
+  var coords=routeStops.map(function(s){return s.lng+','+s.lat;}).join(';');
+  fetch('https://router.project-osrm.org/route/v1/driving/'+coords+'?overview=false&steps=false')
+  .then(function(r){return r.json();})
+  .then(function(data){
+    var driveSecs=0,driveKm=0;
+    if(data.routes&&data.routes[0]){
+      driveSecs=data.routes[0].duration;
+      driveKm=data.routes[0].distance/1000;
+    }
+    buildSummaryHTML(body,startTime,driverName,vehName,driveSecs,driveKm);
+  })
+  .catch(function(){
+    buildSummaryHTML(body,startTime,driverName,vehName,0,0);
+  });
+}
+
+function addMinsToTime(t,m){
+  var parts=t.split(':');
+  var total=parseInt(parts[0])*60+parseInt(parts[1])+m;
+  return String(Math.floor(total/60)%24).padStart(2,'0')+':'+String(total%60).padStart(2,'0');
+}
+
+function buildSummaryHTML(body,startTime,driverName,vehName,driveSecs,driveKm){
+  var stopMins=routeStops.reduce(function(a,s){return a+(s.dur||15);},0);
+  var driveH=Math.floor(driveSecs/3600);
+  var driveM=Math.round((driveSecs%3600)/60);
+  var totalMins=Math.round(driveSecs/60)+stopMins;
+  var finishTime=addMinsToTime(startTime,totalMins);
+  var avgDrive=routeStops.length>1?Math.round(driveSecs/60/(routeStops.length-1)):0;
+  var html='';
+  html+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px;">';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">';
+  html+='<div><div style="font-size:20px;font-weight:600;">'+driveH+'h '+driveM+'m</div><div style="font-size:10px;color:var(--muted);">Drive time</div></div>';
+  html+='<div><div style="font-size:20px;font-weight:600;">'+(driveKm>0?driveKm.toFixed(1):'?')+' km</div><div style="font-size:10px;color:var(--muted);">Distance</div></div>';
+  html+='<div><div style="font-size:20px;font-weight:600;">'+stopMins+' min</div><div style="font-size:10px;color:var(--muted);">Stop time</div></div>';
+  html+='</div>';
+  html+='<div style="margin-top:8px;text-align:center;font-size:12px;">Start <b>'+startTime+'</b> &rarr; Est. finish <b>'+finishTime+'</b> &middot; <b>'+routeStops.length+'</b> stops</div>';
+  html+='</div>';
+  html+='<div style="font-size:11px;margin-bottom:8px;"><b>Driver:</b> '+driverName+' &nbsp;&middot;&nbsp; <b>Vehicle:</b> '+vehName+'</div>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+  html+='<tr style="border-bottom:2px solid var(--border);font-weight:600;"><td style="padding:4px;">#</td><td style="padding:4px;">Stop</td><td style="padding:4px;text-align:center;">Arrive</td><td style="padding:4px;text-align:center;">Mins</td></tr>';
+  var t=startTime;
+  var summaryLines='Route Summary\n';
+  summaryLines+='Driver: '+driverName+' | Vehicle: '+vehName+'\n';
+  summaryLines+='Start: '+startTime+' | Finish: ~'+finishTime+'\n';
+  summaryLines+='Drive: '+driveH+'h '+driveM+'m | Distance: '+(driveKm>0?driveKm.toFixed(1)+'km':'unknown')+'\n';
+  summaryLines+='Stop time: '+stopMins+'min | Stops: '+routeStops.length+'\n\n';
+  for(var i=0;i<routeStops.length;i++){
+    var s=routeStops[i];
+    var col=bc(s.b);
+    html+='<tr style="border-bottom:1px solid var(--border);">';
+    html+='<td style="padding:4px;"><span style="background:'+col+';color:#fff;border-radius:3px;padding:1px 5px;font-family:monospace;font-size:10px;">'+(i+1)+'</span></td>';
+    html+='<td style="padding:4px;"><b>'+s.n+'</b><br><span style="font-size:10px;color:var(--muted);">'+(s.a||'')+'</span></td>';
+    html+='<td style="padding:4px;text-align:center;font-family:monospace;">'+t+'</td>';
+    html+='<td style="padding:4px;text-align:center;">'+(s.dur||15)+'</td>';
+    html+='</tr>';
+    summaryLines+=(i+1)+'. '+s.n+'\n   Arrive: '+t+' | Stop: '+(s.dur||15)+' min\n   '+(s.a||'')+'\n';
+    t=addMinsToTime(t,(s.dur||15)+(i<routeStops.length-1?avgDrive:0));
+  }
+  html+='</table>';
+  if(driveKm===0){
+    html+='<p style="font-size:10px;color:var(--muted);margin-top:8px;">Distance unavailable (no internet). Times are estimates only.</p>';
+  }
+  body.innerHTML=html;
+  window._lastSummaryText=summaryLines;
+}
+
+function copySummary(){
+  var txt=window._lastSummaryText||'No summary yet';
+  navigator.clipboard.writeText(txt).then(function(){toast('Copied!');}).catch(function(){prompt('Copy:',txt);});
+}
 </script>
 </body>
 </html>
