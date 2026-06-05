@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Store Route Planner — SG</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 :root{--bg:#f5f4f0;--surface:#fff;--border:#dddbd4;--border2:#c8c6be;--text:#1a1916;--muted:#6b6960;--accent:#1a4d8f;--danger:#b83232;--success:#0d6e4f;--warning:#c47d10;}
@@ -146,6 +147,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   <button class="hbtn" onclick="openTab('goods')">&#128230; Goods</button>
   <button class="hbtn" onclick="exportJSON()">&#8681; Backup</button>
   <button class="hbtn" onclick="importJSON()">&#8679; Restore</button>
+  <button class="hbtn" onclick="openHistoryModal()">&#128336; History</button>
+  <span id="db-status" style="font-size:10px;color:#7ec8a0;display:none;padding:0 6px;"></span>
 </header>
 
 <div class="main">
@@ -380,6 +383,21 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   <div class="mbtns" style="margin-top:10px;">
     <button class="btn-c" onclick="closeModal('summary-modal')">Close</button>
     <button class="btn-p" onclick="copySummary()">&#9741; Copy</button>
+    <button class="btn-p" style="background:#0d6e4f;" onclick="saveToHistory()">&#128190; Save to history</button>
+  </div>
+</div></div>
+
+
+<!-- ROUTE HISTORY MODAL -->
+<div class="modal-bg" id="history-modal">
+<div class="modal" style="width:560px;">
+  <h3>&#128336; Route History</h3>
+  <div id="history-body" style="font-size:12px;max-height:400px;overflow-y:auto;">
+    <span style="color:var(--muted);">Loading...</span>
+  </div>
+  <div class="mbtns" style="margin-top:10px;">
+    <button class="btn-c" onclick="closeModal('history-modal')">Close</button>
+    <button class="btn-p" onclick="loadHistory()">&#8635; Refresh</button>
   </div>
 </div></div>
 
@@ -395,109 +413,11 @@ function saveBrands(){localStorage.setItem('sg_brands',JSON.stringify(BRANDS));}
 function bc(b){return BRANDS[b]||'#888780';}
 
 // ── DEFAULT STORES ──────────────────────────────────────────────────────────
-const DS=[
-  {b:'I-TEA',n:'TP201 – Tampines St 21',a:'Blk 201B Tampines Street 21 #01-K1',lat:1.353375,lng:103.953077,dur:15},
-  {b:'I-TEA',n:'TP828 – Tampines St 81',a:'Blk 828A Tampines Street 81 #01-156',lat:1.349126,lng:103.934276,dur:15},
-  {b:'I-TEA',n:'EM – Elias Road',a:'Blk 625 Elias Road #01-K6',lat:1.378614,lng:103.942044,dur:15},
-  {b:'I-TEA',n:'OTH – Our Tampines Hub',a:'1 Tampines Walk #B1-K29',lat:1.353535,lng:103.940253,dur:15},
-  {b:'I-TEA',n:'BD205 – Bedok North St 1',a:'Blk 205 Bedok North Street 1 #01-367',lat:1.326009,lng:103.930940,dur:15},
-  {b:'I-TEA',n:'FS84 – Bedok North St 4',a:'Blk 84 Bedok North Street 4 #01-73',lat:1.332058,lng:103.939232,dur:15},
-  {b:'I-TEA',n:'PLS – Paya Lebar Square',a:'60 Paya Lebar Road #01-50',lat:1.319492,lng:103.892750,dur:15},
-  {b:'I-TEA',n:'NEX – Serangoon',a:'20 Serangoon Ave 2 #B2-103',lat:1.350557,lng:103.871999,dur:15},
-  {b:'I-TEA',n:'TP – Tanjong Pagar Plaza',a:'1 Tanjong Pagar Plaza #01-52',lat:1.276216,lng:103.842838,dur:15},
-  {b:'I-TEA',n:'BK – Bendemeer Road',a:'Blk 25 Bendemeer Road #01-595',lat:1.318719,lng:103.862252,dur:15},
-  {b:'I-TEA',n:'YS – Northpoint City',a:'1 Northpoint Drive South Wing #B2-119',lat:1.428264,lng:103.835982,dur:15},
-  {b:'I-TEA',n:'KH846 – Yishun Ring Road',a:'Blk 846 Yishun Ring Road #01-3627',lat:1.416792,lng:103.834578,dur:15},
-  {b:'I-TEA',n:'WL888 – Woodlands Drive',a:'Blk 888 Woodlands Drive #01-747',lat:1.437484,lng:103.795158,dur:15},
-  {b:'I-TEA',n:'JR504 – Jurong West St 51',a:'Blk 504 Jurong West St 51 #01-243',lat:1.349225,lng:103.719200,dur:15},
-  {b:'I-TEA',n:'JR372 – Bukit Batok St 31',a:'Blk 372 Bukit Batok St 31 #01-370',lat:1.358909,lng:103.751211,dur:15},
-  {b:'I-TEA',n:'CL442 – Clementi Ave 3',a:'442 Clementi Avenue 3 #01-87',lat:1.314054,lng:103.764416,dur:15},
-  {b:'I-TEA',n:'BL221 – Boon Lay Shopping Ctr',a:'221 Boon Lay Place #01-116',lat:1.346208,lng:103.712434,dur:15},
-  {b:'I-TEA',n:'JW960 – Jurong West St 92',a:'Blk 960 Jurong West Street 92 #01-180',lat:1.341385,lng:103.691428,dur:15},
-  {b:'I-TEA',n:'JW495 – Jurong West St 41',a:'Blk 495 Jurong West Street 41 #01-104',lat:1.349745,lng:103.724346,dur:15},
-  {b:'I-TEA',n:'CL727 – Clementi West St 2',a:'Blk 727 Clementi West Street 2 #01-240',lat:1.304200,lng:103.763811,dur:15},
-  {b:'I-TEA',n:'BB154 – Bukit Batok St 11',a:'Blk 154 Bukit Batok Street 11 #01-310',lat:1.347680,lng:103.743986,dur:15},
-  {b:'I-TEA',n:'CP103 – Yishun Chong Pang',a:'Blk 103 Yishun Ring Road #01-65',lat:1.431968,lng:103.829203,dur:15},
-  {b:'I-TEA',n:'WP88 – Whampoa Drive',a:'Blk 88 Whampoa Drive #01-857',lat:1.323276,lng:103.855163,dur:15},
-  {b:'I-TEA',n:'HG811 – Hougang Central',a:'Blk 811 Hougang Central #01-210',lat:1.371758,lng:103.893878,dur:15},
-  {b:'I-TEA',n:'JE135 – Jurong Gateway Rd',a:'Blk 135 Jurong Gateway Road #01-327',lat:1.333839,lng:103.739715,dur:15},
-  {b:'I-TEA',n:'CT – Peoples Park Complex',a:'1 Park Road #01-K99I',lat:1.284536,lng:103.842329,dur:15},
-  {b:'I-TEA',n:'BP258 – Bukit Panjang Ring Rd',a:'Blk 258 Bukit Panjang Ring Road #01-52',lat:1.377894,lng:103.773136,dur:15},
-  {b:'I-TEA',n:'BW – Beauty World Centre',a:'144 Upper Bukit Timah Road #01-02',lat:1.342374,lng:103.776259,dur:15},
-  {b:'I-TEA',n:'HG682 – Hougang Ave 4',a:'Blk 682 Hougang Avenue 4 #01-360',lat:1.373668,lng:103.885449,dur:15},
-  {b:'I-TEA',n:'PR MRT – Pasir Ris MRT',a:'10 Pasir Ris Central #01-06',lat:1.373213,lng:103.949277,dur:15},
-  {b:'I-TEA',n:'BS282 – Bishan St 22',a:'Blk 282 Bishan Street 22 #01-151',lat:1.358250,lng:103.844901,dur:15},
-  {b:'I-TEA',n:'BL MRT – Boon Lay MRT',a:'301 Boon Lay Way #01-30',lat:1.338433,lng:103.705336,dur:15},
-  {b:'I-TEA',n:'HG1 – Hougang 1',a:'1 Hougang Street 91 #01-02',lat:1.375802,lng:103.879431,dur:15},
-  {b:'I-TEA',n:'BS513 – Bishan St 13',a:'Blk 513 Bishan Street 13 #01-504',lat:1.349433,lng:103.849479,dur:15},
-  {b:'I-TEA',n:'WL302 – Woodlands St 31',a:'Blk 302 Woodlands Street 31 #01-287',lat:1.431842,lng:103.774407,dur:15},
-  {b:'I-TEA',n:'TB18 – Jalan Membina',a:'Blk 18 Jalan Membina #01-04',lat:1.285395,lng:103.826727,dur:15},
-  {b:'I-TEA',n:'AMK531 – Ang Mo Kio Ave 10',a:'Blk 531 Ang Mo Kio Ave 10 #01-2441',lat:1.373311,lng:103.854461,dur:15},
-  {b:'I-TEA',n:'BB274 – Bukit Batok East Ave 4',a:'Blk 274 Bukit Batok East Avenue 4 #01-94',lat:1.348080,lng:103.757961,dur:15},
-  {b:'I-TEA',n:'TPY21 – Toa Payoh',a:'Blk 21 Lorong 7 Toa Payoh #01-284',lat:1.335228,lng:103.857528,dur:15},
-  {b:'I-TEA',n:'HLM – Heartland Mall Kovan',a:'Blk 205 Hougang Street 21 #02-08A',lat:1.359469,lng:103.885129,dur:15},
-  {b:'I-TEA',n:'CCK – Choa Chu Kang Ave 4',a:'10 Choa Chu Kang Avenue 4 #01-2B',lat:1.385409,lng:103.744333,dur:15},
-  {b:'I-TEA',n:'PSR442 – Pasir Ris Dr 6',a:'Blk 442 Pasir Ris Drive 6 #01-40',lat:1.369037,lng:103.957681,dur:15},
-  {b:'I-TEA',n:'J9 – Junction 9 Yishun',a:'18 Yishun Ave 9 #02-13',lat:1.433221,lng:103.841488,dur:15},
-  {b:'I-TEA',n:'BD57A – New Upper Changi',a:'Blk 57A New Upper Changi Road #01-1372',lat:1.324242,lng:103.941100,dur:15},
-  {b:'I-TEA',n:'AMK HUB – AMK Hub',a:'53 Ang Mo Kio Ave 3 #B1-66/67/68',lat:1.369002,lng:103.848159,dur:15},
-  {b:'I-TEA',n:'ADM – Woodlands Ave 6',a:'Blk 678A Woodlands Ave 6 #01-06A',lat:1.440414,lng:103.801623,dur:15},
-  {b:'I-TEA',n:'LAV – V Hotel Lavender',a:'70 Jellicoe Road #01-18',lat:1.307997,lng:103.862781,dur:15},
-  {b:'I-TEA',n:'T3 – Changi Airport T3',a:'65 Airport Boulevard #B2-30',lat:1.358371,lng:103.985641,dur:15},
-  {b:'I-TEA',n:'CRP – Bukit Timah NTUC Finest',a:'587 Bukit Timah Road #01-01',lat:1.323906,lng:103.809992,dur:15},
-  {b:'I-TEA',n:'BB MRT – Bukit Batok MRT',a:'10 Bukit Batok Central #01-02',lat:1.349058,lng:103.749625,dur:15},
-  {b:'I-TEA',n:'BS MRT – Bishan MRT',a:'200 Bishan Road #01-06',lat:1.350778,lng:103.848722,dur:15},
-  {b:'I-TEA',n:'HAIG – Haig View',a:'Haig Road Haig View 12 #01-333',lat:1.313577,lng:103.896063,dur:15},
-  {b:'I-TEA',n:'EP – Eastpoint Mall',a:'3 Simei Street 6 #01-K1',lat:1.342715,lng:103.953042,dur:15},
-  {b:'I-TEA',n:'SELEGIE – GR.iD',a:'1 Selegie Road #01-04',lat:1.300195,lng:103.849227,dur:15},
-  {b:'I-TEA',n:'i12 – East Coast Rd',a:'112 East Coast Road #B1-34',lat:1.305200,lng:103.905065,dur:15},
-  {b:'I-TEA',n:'CT2 – Peoples Park #K94A',a:'1 Park Road #01-K94A',lat:1.285700,lng:103.844500,dur:15},
-  {b:'I-TEA',n:'WSM – Wisma Atria Orchard',a:'435 Orchard Road #B1-02',lat:1.303715,lng:103.833264,dur:15},
-  {b:'I-TEA',n:'TMP MRT – Tampines MRT',a:'20 Tampines Central 1 #01-30',lat:1.353198,lng:103.945409,dur:15},
-  {b:'I-TEA',n:'CCP – Changi City Point',a:'5 Changi Business Park Central 1 #B1-K6',lat:1.334273,lng:103.962739,dur:15},
-  {b:'I-TEA',n:'HAJI LANE',a:'34 Haji Lane',lat:1.300887,lng:103.859041,dur:15},
-  {b:'I-TEA',n:'UNITED SQ – United Square',a:'101 Thomson Road #01-59',lat:1.317185,lng:103.843605,dur:15},
-  {b:'I-TEA',n:'WLD MRT – Woodlands MRT',a:'30 Woodlands Avenue 2 #01-40',lat:1.436897,lng:103.786581,dur:15},
-  {b:'I-TEA',n:'EUNOS MRT – Eunos Crescent',a:'30 Eunos Cres #01-10',lat:1.319705,lng:103.902856,dur:15},
-  {b:'I-TEA',n:'CTP – Chinatown Point',a:'133 New Bridge Rd #02-51',lat:1.285209,lng:103.844723,dur:15},
-  {b:'I-TEA',n:'PARKWAY – Parkway Parade',a:'80 Marine Parade Road #B1-83',lat:1.301337,lng:103.905233,dur:15},
-  {b:'I-TEA',n:'PUNGGOL PLAZA',a:'168 Punggol Field #01-09',lat:1.394175,lng:103.913040,dur:15},
-  {b:'I-TEA',n:'ANCHOR POINT – Alexandra Rd',a:'370 Alexandra Road #B1-13',lat:1.288572,lng:103.805144,dur:15},
-  {b:'I-TEA',n:'BUGIS+ – Victoria St',a:'201 Victoria St #05-09',lat:1.299596,lng:103.854219,dur:15},
-  {b:'I-TEA',n:'TMP GIANT – Tampines Giant',a:'21 Tampines North 2 #03-01',lat:1.372155,lng:103.931982,dur:15},
-  {b:'Duozoulu',n:'JP-ZULIZ – Jurong Point',a:'63 Jurong West Central 3 #03-66',lat:1.339700,lng:103.706100,dur:15},
-  {b:'Duozoulu',n:'NEX – Serangoon',a:'23 Serangoon Central #B1-56',lat:1.351200,lng:103.873200,dur:15},
-  {b:'Duozoulu',n:'JUNCTION 8 – Bishan',a:'9 Bishan Place #02-51',lat:1.351200,lng:103.849800,dur:15},
-  {b:'Duozoulu',n:'EASTPOINT MALL – Simei',a:'3 Simei Street 6 #01-21/22',lat:1.342900,lng:103.953800,dur:15},
-  {b:'Duozoulu',n:'WHITE SANDS – Pasir Ris',a:'1 Pasir Ris Central Street 3',lat:1.374200,lng:103.950200,dur:15},
-  {b:'Vivaia',n:'BUGIS JUNCTION',a:'200 Victoria St #01-11',lat:1.299400,lng:103.855200,dur:15},
-  {b:'Vivaia',n:'BEDOK MALL',a:'311 New Upper Changi Rd #01-65/66',lat:1.324600,lng:103.930500,dur:15},
-  {b:'Vivaia',n:'WISMA – Orchard',a:'435 Orchard Rd #B1-25',lat:1.304000,lng:103.833700,dur:15},
-  {b:'Vivaia',n:'VIVOCITY – Harbourfront',a:'1 Harbourfront Walk #02-199',lat:1.264100,lng:103.822100,dur:15},
-  {b:'Vivaia',n:'WESTGATE – Jurong',a:'3 Gateway Dr #02-16',lat:1.334200,lng:103.742200,dur:15},
-  {b:'Vivaia',n:'JEWEL – Changi Airport',a:'78 Airport Boulevard #B1-254/255',lat:1.360100,lng:103.989200,dur:15},
-  {b:'Vivaia',n:'PARKWAY PARADE',a:'80 Marine Parade Rd #01-27',lat:1.301600,lng:103.906100,dur:15},
-  {b:'Beneunder',n:'WESTGATE – Jurong',a:'3 Gateway Dr #02-41',lat:1.334100,lng:103.740200,dur:15},
-  {b:'I-Bread',n:'HG682 – Hougang Ave 4 (DEWI)',a:'Blk 682 Hougang Avenue 4 #01-360',lat:1.374000,lng:103.885800,dur:15},
-  {b:'I-Bread',n:'BW – Beauty World Ctr (DEWI)',a:'144 Upper Bukit Timah Road #01-08',lat:1.342700,lng:103.776700,dur:15},
-  {b:'I-Bread',n:'CL449 – Clementi Ave 3 (DEWI)',a:'449 Clementi Ave 3 #01-241',lat:1.314300,lng:103.765200,dur:15},
-  {b:'I-Bread',n:'TP – Tanjong Pagar (JONAS)',a:'1 Tanjong Pagar Plaza #01-52',lat:1.276500,lng:103.843200,dur:15},
-  {b:'I-Bread',n:'FACTORY – Kampong Ampat',a:'171 Kampong Ampat #04-14',lat:1.324300,lng:103.871400,dur:30},
-  {b:'I-Bread',n:'CS – Century Square (Guiyu)',a:'2 Tampines Central 5 #01-41',lat:1.342200,lng:103.952900,dur:15},
-  {b:'I-Bread',n:'TP201 – Tampines St 21 (Guiyu)',a:'Blk 201B Tampines St 21 #01-1075',lat:1.354000,lng:103.953800,dur:15},
-  {b:'I-Bread',n:'TPY21 – Toa Payoh (JONAS)',a:'Blk 21 Lorong 7 Toa Payoh #01-284',lat:1.335600,lng:103.858200,dur:15},
-  {b:'I-Bread',n:'CCK – Choa Chu Kang (DEWI)',a:'10 Choa Chu Kang Avenue 4 #01-2G',lat:1.385800,lng:103.745200,dur:15},
-  {b:'I-Bread',n:'PSR442 – Pasir Ris Dr 6 (Guiyu)',a:'Blk 442 Pasir Ris Drive 6 #01-40',lat:1.369400,lng:103.958200,dur:15},
-  {b:'I-Bread',n:'UncleBread – Hougang Ave 4 (JONAS)',a:'BLK 682 Hougang Avenue 4 #01-364',lat:1.373700,lng:103.886200,dur:15},
-  {b:'I-Pot',n:'PLS – Paya Lebar Square',a:'60 Paya Lebar Road #B1-07',lat:1.319800,lng:103.892700,dur:15},
-  {b:'I-Pot',n:'BW – Beauty World Centre',a:'144 Upper Bukit Timah Road #01-35',lat:1.342800,lng:103.777100,dur:15},
-  {b:'Office',n:'3S – Kaki Bukit Industrial',a:'10 Kaki Bukit Road 1 #03-18',lat:1.335700,lng:103.904300,dur:20},
-  {b:'Office',n:'3S Warehouse – Kaki Bukit',a:'10 Kaki Bukit Road 1 #01-38',lat:1.335500,lng:103.904100,dur:20},
-  {b:'Office',n:'Bread Factory – Kampong Ampat',a:'171 Kampong Ampat #04-14',lat:1.324300,lng:103.871600,dur:30},
-  {b:'Office',n:'HKC – Sims Ave',a:'324 Sims Avenue',lat:1.320500,lng:103.887500,dur:15},
-  {b:'Office',n:'COOLEN – Sims Ave',a:'330 Sims Avenue',lat:1.319500,lng:103.886500,dur:15},
-  {b:'Office',n:'3S NEW OFFICE – Tai Seng',a:'3 Tai Seng Avenue #04-37',lat:1.336600,lng:103.888600,dur:15}
-];
+// ── SUPABASE CLIENT ──────────────────────────────────────────────────────────
+const SB_URL = 'https://jczbvggyupndvpiwsgcq.supabase.co';
+const SB_KEY = 'sb_publishable_YN_d4YUdpmtJZX0-OiKSXA_vuC5cL7I';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let stores=[],closedIds=new Set(),routeStops=[],currentFilter='all',showClosed=false;
@@ -506,24 +426,165 @@ let drivers=[],vehicles=[],goods=[];
 let editDriverIdx=null,editVehicleIdx=null,editGoodsIdx=null,assignStopIdx=null;
 let postalTimer=null,lastAIText='',lastAIOrder=null;
 
-// ── PERSIST ──────────────────────────────────────────────────────────────────
-function save(){
-  localStorage.setItem('sg_stores',JSON.stringify(stores));
+// ── SUPABASE DATA LAYER ───────────────────────────────────────────────────────
+// Route stops and closed state still use localStorage (session data, not master data)
+function saveRouteState(){
   localStorage.setItem('sg_closed',JSON.stringify([...closedIds]));
   localStorage.setItem('sg_route',JSON.stringify(routeStops));
-  localStorage.setItem('sg_drivers',JSON.stringify(drivers));
-  localStorage.setItem('sg_vehicles',JSON.stringify(vehicles));
-  localStorage.setItem('sg_goods',JSON.stringify(goods));
 }
-function load(){
-  function lp(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch(e){return def;}}
-  stores=lp('sg_stores',JSON.parse(JSON.stringify(DS)));
-  closedIds=new Set(lp('sg_closed',[]));
-  routeStops=lp('sg_route',[]).filter(r=>r.idx<stores.length);
-  drivers=lp('sg_drivers',[{name:'Driver A',contact:''},{name:'Driver B',contact:''},{name:'Driver C',contact:''}]);
-  vehicles=lp('sg_vehicles',[]);
-  goods=lp('sg_goods',[]);
+function loadRouteState(){
+  try{const v=localStorage.getItem('sg_closed');closedIds=v?new Set(JSON.parse(v)):new Set();}catch(e){closedIds=new Set();}
+  try{const v=localStorage.getItem('sg_route');routeStops=v?JSON.parse(v):[];}catch(e){routeStops=[];}
 }
+
+// ── LOAD ALL MASTER DATA FROM SUPABASE ───────────────────────────────────────
+async function loadAllFromDB(){
+  showDBStatus('Loading data...');
+  try{
+    // Brands
+    const {data:bData}=await sb.from('brands').select('*').order('name');
+    if(bData&&bData.length){
+      BRANDS={};
+      bData.forEach(b=>{BRANDS[b.name]=b.color;});
+    }
+    // Stores
+    const {data:sData}=await sb.from('stores').select('*').order('name');
+    if(sData){
+      stores=sData.map(s=>({
+        id:s.id,b:s.brand,n:s.name,a:s.address||'',postal:s.postal||'',
+        lat:parseFloat(s.lat)||0,lng:parseFloat(s.lng)||0,
+        dur:s.stop_duration_mins||15,is_closed:s.is_closed||false,
+        adhocNote:s.adhoc_note||''
+      }));
+      // Geocode any stores missing lat/lng
+      const needsGeo=stores.filter(s=>(!s.lat||!s.lng)&&(s.postal||s.a));
+      if(needsGeo.length){
+        showDBStatus('Geocoding '+needsGeo.length+' stores without coordinates...');
+        for(const s of needsGeo){
+          const query=encodeURIComponent((s.postal||s.a)+' Singapore');
+          try{
+            const r=await fetch('https://nominatim.openstreetmap.org/search?q='+query+'&format=json&limit=1',{headers:{'Accept-Language':'en'}});
+            const d=await r.json();
+            if(d&&d.length){
+              s.lat=parseFloat(d[0].lat);
+              s.lng=parseFloat(d[0].lon);
+              // Save back to DB so we don't geocode again next time
+              await sb.from('stores').update({lat:s.lat,lng:s.lng}).eq('id',s.id);
+            }
+          }catch(e){}
+          await new Promise(res=>setTimeout(res,300)); // rate limit nominatim
+        }
+        showDBStatus('');
+      }
+      // sync closedIds from DB
+      closedIds=new Set();
+      stores.forEach((s,i)=>{if(s.is_closed)closedIds.add(i);});
+    }
+    // Drivers
+    const {data:dData}=await sb.from('drivers').select('*').order('name');
+    if(dData) drivers=dData.map(d=>({id:d.id,name:d.name,contact:d.contact||''}));
+    // Vehicles
+    const {data:vData}=await sb.from('vehicles').select('*').order('name');
+    if(vData) vehicles=vData.map(v=>({id:v.id,name:v.name,type:v.type||'Lorry',h:v.height_cm||0,l:v.length_cm||0,w:v.width_cm||0,notes:v.notes||''}));
+    // Goods
+    const {data:gData}=await sb.from('goods').select('*').order('name');
+    if(gData) goods=gData.map(g=>({id:g.id,name:g.name,h:g.height_cm||0,l:g.length_cm||0,w:g.width_cm||0,qty:g.default_qty||1,notes:g.notes||''}));
+    // Restore route state from localStorage
+    loadRouteState();
+    // Validate route indices still valid
+    routeStops=routeStops.filter(r=>r.idx<stores.length);
+    showDBStatus('');
+    return true;
+  }catch(e){
+    showDBStatus('DB error: '+e.message,'error');
+    return false;
+  }
+}
+
+function showDBStatus(msg,type){
+  let el=document.getElementById('db-status');
+  if(!el)return;
+  el.textContent=msg;
+  el.style.color=type==='error'?'#b83232':'#0d6e4f';
+  el.style.display=msg?'block':'none';
+}
+
+// ── STORE CRUD ────────────────────────────────────────────────────────────────
+async function dbSaveStore(entry,id){
+  const row={
+    brand:entry.b,name:entry.n,address:entry.a,postal:entry.postal,
+    lat:entry.lat,lng:entry.lng,stop_duration_mins:entry.dur,
+    is_closed:false,adhoc_note:entry.adhocNote||null
+  };
+  if(id){
+    const {error}=await sb.from('stores').update(row).eq('id',id);
+    return error?null:id;
+  }else{
+    const {data,error}=await sb.from('stores').insert(row).select('id').single();
+    return error?null:data.id;
+  }
+}
+async function dbDeleteStore(id){
+  const {error}=await sb.from('stores').delete().eq('id',id);
+  return !error;
+}
+async function dbToggleClosed(id,isClosed){
+  await sb.from('stores').update({is_closed:isClosed}).eq('id',id);
+}
+
+// ── DRIVER CRUD ───────────────────────────────────────────────────────────────
+async function dbSaveDriver(entry,id){
+  const row={name:entry.name,contact:entry.contact||null};
+  if(id){await sb.from('drivers').update(row).eq('id',id);}
+  else{const {data}=await sb.from('drivers').insert(row).select('id').single();return data?data.id:null;}
+}
+async function dbDeleteDriver(id){await sb.from('drivers').delete().eq('id',id);}
+
+// ── VEHICLE CRUD ──────────────────────────────────────────────────────────────
+async function dbSaveVehicle(entry,id){
+  const row={name:entry.name,type:entry.type,height_cm:entry.h||null,length_cm:entry.l||null,width_cm:entry.w||null,notes:entry.notes||null};
+  if(id){await sb.from('vehicles').update(row).eq('id',id);}
+  else{const {data}=await sb.from('vehicles').insert(row).select('id').single();return data?data.id:null;}
+}
+async function dbDeleteVehicle(id){await sb.from('vehicles').delete().eq('id',id);}
+
+// ── GOODS CRUD ────────────────────────────────────────────────────────────────
+async function dbSaveGoods(entry,id){
+  const row={name:entry.name,height_cm:entry.h||null,length_cm:entry.l||null,width_cm:entry.w||null,default_qty:entry.qty||1,notes:entry.notes||null};
+  if(id){await sb.from('goods').update(row).eq('id',id);}
+  else{const {data}=await sb.from('goods').insert(row).select('id').single();return data?data.id:null;}
+}
+async function dbDeleteGoods(id){await sb.from('goods').delete().eq('id',id);}
+
+// ── BRAND CRUD ────────────────────────────────────────────────────────────────
+async function dbSaveBrand(name,color){
+  await sb.from('brands').upsert({name,color},{onConflict:'name'});
+}
+
+// ── ROUTE HISTORY ─────────────────────────────────────────────────────────────
+async function saveRouteHistory(summaryText,totalKm){
+  const dIdx=document.getElementById('start-driver').value;
+  const vIdx=document.getElementById('start-vehicle').value;
+  const driverId=dIdx!==''&&drivers[dIdx]?drivers[dIdx].id||null:null;
+  const vehicleId=vIdx!==''&&vehicles[vIdx]?vehicles[vIdx].id||null:null;
+  const startTime=document.getElementById('start-time').value||'08:00';
+  const row={
+    route_date:new Date().toISOString().split('T')[0],
+    driver_id:driverId,
+    vehicle_id:vehicleId,
+    start_time:startTime,
+    stops:JSON.stringify(routeStops.map((s,i)=>({order:i+1,name:s.n,address:s.a,brand:s.b,dur:s.dur||15}))),
+    summary_text:summaryText,
+    total_km:totalKm||null
+  };
+  const {error}=await sb.from('route_history').insert(row);
+  if(!error)toast('Route saved to history!');
+  else toast('Could not save history: '+error.message);
+}
+
+// ── LEGACY STUBS (keep old function names working) ────────────────────────────
+function save(){saveRouteState();}
+function load(){loadRouteState();}
 
 // ── MAP ──────────────────────────────────────────────────────────────────────
 const map=L.map('map').setView([1.352,103.820],11);
@@ -839,9 +900,12 @@ function saveGoodsAssign(){
 
 // ── CLOSED ───────────────────────────────────────────────────────────────────
 function toggleClosed(idx){
-  if(closedIds.has(idx)){closedIds.delete(idx);}
+  const wasC=closedIds.has(idx);
+  if(wasC){closedIds.delete(idx);}
   else{closedIds.add(idx);routeStops=routeStops.filter(r=>r.idx!==idx);renderRoute();}
-  save();renderMapMarkers();drawRoute();renderList();toast(closedIds.has(idx)?'Marked closed':'Marked open');
+  const storeId=stores[idx]?stores[idx].id:null;
+  if(storeId)dbToggleClosed(storeId,!wasC);
+  save();renderMapMarkers();drawRoute();renderList();toast(!wasC?'Marked closed':'Marked open');
 }
 function toggleShowClosed(){
   showClosed=!showClosed;
@@ -908,7 +972,9 @@ function addNewBrand(){
   const name=document.getElementById('m-new-brand').value.trim(),color=document.getElementById('m-brand-color').value;
   if(!name){toast('Enter brand name');return;}
   if(BRANDS[name]){toast('Already exists');return;}
-  BRANDS[name]=color;saveBrands();buildFilters();populateBrandSelect();
+  BRANDS[name]=color;
+  dbSaveBrand(name,color);
+  saveBrands();buildFilters();populateBrandSelect();
   document.getElementById('m-brand').value=name;document.getElementById('new-brand-wrap').style.display='none';
   document.getElementById('m-new-brand').value='';toast('Brand "'+name+'" added!');
 }
@@ -975,16 +1041,31 @@ async function saveStore(){
   }
   const entry={b:brand,n:name,a:addr,postal,lat,lng,dur};
   if(adhocNote)entry.adhocNote=adhocNote;
-  if(editIdx!==null){stores[editIdx]=entry;routeStops=routeStops.map(r=>r.idx===editIdx?{...r,...entry}:r);toast('Updated');}
-  else{stores.push(entry);toast(isAdhoc?'Ad-hoc added':'Store added');}
-  save();closeModal('store-modal');buildFilters();renderList();renderMapMarkers();drawRoute();renderRoute();
+  const existingId=editIdx!==null&&stores[editIdx]?stores[editIdx].id:null;
+  const btn=document.getElementById('save-store-btn');btn.disabled=true;btn.textContent='Saving...';
+  dbSaveStore(entry,existingId).then(function(newId){
+    btn.disabled=false;btn.textContent='Save';
+    if(!newId&&newId!==existingId){toast('Save failed - check DB');return;}
+    if(editIdx!==null){
+      entry.id=existingId;stores[editIdx]=entry;
+      routeStops=routeStops.map(r=>r.idx===editIdx?Object.assign({},r,entry):r);
+      toast('Updated');
+    }else{
+      entry.id=newId;stores.push(entry);toast(isAdhoc?'Ad-hoc added':'Store added');
+    }
+    save();closeModal('store-modal');buildFilters();renderList();renderMapMarkers();drawRoute();renderRoute();
+  });
+  return;
 }
 function deleteStore(){
   if(editIdx===null)return;
   if(!confirm('Delete "'+stores[editIdx].n+'"?'))return;
-  routeStops=routeStops.filter(r=>r.idx!==editIdx).map(r=>({...r,idx:r.idx>editIdx?r.idx-1:r.idx}));
-  const nc=new Set();closedIds.forEach(id=>nc.add(id>editIdx?id-1:id));closedIds=nc;
-  stores.splice(editIdx,1);save();closeModal('store-modal');buildFilters();renderList();renderMapMarkers();drawRoute();renderRoute();toast('Deleted');
+  const delId=stores[editIdx].id;
+  dbDeleteStore(delId).then(function(){
+    routeStops=routeStops.filter(r=>r.idx!==editIdx).map(r=>Object.assign({},r,{idx:r.idx>editIdx?r.idx-1:r.idx}));
+    const nc=new Set();closedIds.forEach(id=>nc.add(id>editIdx?id-1:id));closedIds=nc;
+    stores.splice(editIdx,1);save();closeModal('store-modal');buildFilters();renderList();renderMapMarkers();drawRoute();renderRoute();toast('Deleted');
+  });
 }
 function openDriverModal(idx){
   editDriverIdx=idx===undefined?null:idx;
@@ -998,13 +1079,20 @@ function saveDriver(){
   const name=document.getElementById('d-name').value.trim();
   if(!name){toast('Name required');return;}
   const entry={name,contact:document.getElementById('d-contact').value.trim()};
-  if(editDriverIdx!==null)drivers[editDriverIdx]=entry;else drivers.push(entry);
-  save();closeModal('driver-modal');renderDrivers();populateDriverVehicleSelects();toast('Saved');
+  const existingId=editDriverIdx!==null&&drivers[editDriverIdx]?drivers[editDriverIdx].id:null;
+  dbSaveDriver(entry,existingId).then(function(newId){
+    if(editDriverIdx!==null){entry.id=existingId;drivers[editDriverIdx]=entry;}
+    else{entry.id=newId;drivers.push(entry);}
+    save();closeModal('driver-modal');renderDrivers();populateDriverVehicleSelects();toast('Saved');
+  });
 }
 function deleteDriver(){
   if(editDriverIdx===null)return;
   if(!confirm('Delete driver?'))return;
-  drivers.splice(editDriverIdx,1);save();closeModal('driver-modal');renderDrivers();populateDriverVehicleSelects();toast('Deleted');
+  const delId=drivers[editDriverIdx].id;
+  dbDeleteDriver(delId).then(function(){
+    drivers.splice(editDriverIdx,1);save();closeModal('driver-modal');renderDrivers();populateDriverVehicleSelects();toast('Deleted');
+  });
 }
 function openVehicleModal(idx){
   editVehicleIdx=idx===undefined?null:idx;
@@ -1023,13 +1111,20 @@ function saveVehicle(){
   const name=document.getElementById('v-name').value.trim();
   if(!name){toast('Name required');return;}
   const entry={name,type:document.getElementById('v-type').value,h:parseInt(document.getElementById('v-h').value)||0,l:parseInt(document.getElementById('v-l').value)||0,w:parseInt(document.getElementById('v-w').value)||0,notes:document.getElementById('v-notes').value.trim()};
-  if(editVehicleIdx!==null)vehicles[editVehicleIdx]=entry;else vehicles.push(entry);
-  save();closeModal('vehicle-modal');renderVehicles();populateDriverVehicleSelects();toast('Saved');
+  const existingId=editVehicleIdx!==null&&vehicles[editVehicleIdx]?vehicles[editVehicleIdx].id:null;
+  dbSaveVehicle(entry,existingId).then(function(newId){
+    if(editVehicleIdx!==null){entry.id=existingId;vehicles[editVehicleIdx]=entry;}
+    else{entry.id=newId;vehicles.push(entry);}
+    save();closeModal('vehicle-modal');renderVehicles();populateDriverVehicleSelects();toast('Saved');
+  });
 }
 function deleteVehicle(){
   if(editVehicleIdx===null)return;
   if(!confirm('Delete vehicle?'))return;
-  vehicles.splice(editVehicleIdx,1);save();closeModal('vehicle-modal');renderVehicles();populateDriverVehicleSelects();toast('Deleted');
+  const delId=vehicles[editVehicleIdx].id;
+  dbDeleteVehicle(delId).then(function(){
+    vehicles.splice(editVehicleIdx,1);save();closeModal('vehicle-modal');renderVehicles();populateDriverVehicleSelects();toast('Deleted');
+  });
 }
 function openGoodsModal(idx){
   editGoodsIdx=idx===undefined?null:idx;
@@ -1048,13 +1143,20 @@ function saveGoods(){
   const name=document.getElementById('g-name').value.trim();
   if(!name){toast('Name required');return;}
   const entry={name,h:parseInt(document.getElementById('g-h').value)||0,l:parseInt(document.getElementById('g-l').value)||0,w:parseInt(document.getElementById('g-w').value)||0,qty:parseInt(document.getElementById('g-qty').value)||1,notes:document.getElementById('g-notes').value.trim()};
-  if(editGoodsIdx!==null)goods[editGoodsIdx]=entry;else goods.push(entry);
-  save();closeModal('goods-modal');renderGoods();toast('Saved');
+  const existingId=editGoodsIdx!==null&&goods[editGoodsIdx]?goods[editGoodsIdx].id:null;
+  dbSaveGoods(entry,existingId).then(function(newId){
+    if(editGoodsIdx!==null){entry.id=existingId;goods[editGoodsIdx]=entry;}
+    else{entry.id=newId;goods.push(entry);}
+    save();closeModal('goods-modal');renderGoods();toast('Saved');
+  });
 }
 function deleteGoods(){
   if(editGoodsIdx===null)return;
   if(!confirm('Delete goods?'))return;
-  goods.splice(editGoodsIdx,1);save();closeModal('goods-modal');renderGoods();toast('Deleted');
+  const delId=goods[editGoodsIdx].id;
+  dbDeleteGoods(delId).then(function(){
+    goods.splice(editGoodsIdx,1);save();closeModal('goods-modal');renderGoods();toast('Deleted');
+  });
 }
 function openAIModal(){
   if(routeStops.length<2){toast('Add at least 2 stops first');return;}
@@ -1158,13 +1260,17 @@ function importJSON(){
   input.click();
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-['store-modal','driver-modal','vehicle-modal','goods-modal','ai-modal','goods-assign-modal','summary-modal'].forEach(id=>{
+['store-modal','driver-modal','vehicle-modal','goods-modal','ai-modal','goods-assign-modal','summary-modal','history-modal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){if(e.target===this)closeModal(id);});
 });
 function toast(msg,dur=2400){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
-loadBrands();load();buildFilters();renderList();renderMapMarkers();renderRoute();
-renderDrivers();renderVehicles();renderGoods();populateDriverVehicleSelects();
-document.getElementById('start-time').addEventListener('change',()=>{renderRoute();drawRoute();});
+// ── INIT: load from Supabase then render ─────────────────────────────────────
+loadBrands();
+loadAllFromDB().then(function(ok){
+  buildFilters();renderList();renderMapMarkers();renderRoute();
+  renderDrivers();renderVehicles();renderGoods();populateDriverVehicleSelects();
+});
+document.getElementById('start-time').addEventListener('change',function(){renderRoute();drawRoute();});
 
 function showRouteSummary(){
   if(!routeStops.length){toast('No stops in route');return;}
@@ -1241,11 +1347,79 @@ function buildSummaryHTML(body,startTime,driverName,vehName,driveSecs,driveKm){
   }
   body.innerHTML=html;
   window._lastSummaryText=summaryLines;
+  window._lastRouteKm=driveKm;
 }
 
 function copySummary(){
   var txt=window._lastSummaryText||'No summary yet';
   navigator.clipboard.writeText(txt).then(function(){toast('Copied!');}).catch(function(){prompt('Copy:',txt);});
+}
+
+// ── ROUTE HISTORY FUNCTIONS ───────────────────────────────────────────────────
+function openHistoryModal(){
+  document.getElementById('history-modal').classList.add('open');
+  loadHistory();
+}
+
+async function loadHistory(){
+  var body=document.getElementById('history-body');
+  body.innerHTML='<span style="color:var(--muted);">Loading...</span>';
+  try{
+    var result=await sb.from('route_history').select('*, drivers(name), vehicles(name)').order('route_date',{ascending:false}).order('created_at',{ascending:false}).limit(30);
+    var rows=result.data||[];
+    if(!rows.length){body.innerHTML='<p style="color:var(--muted);font-size:12px;">No route history yet. Complete a route and click Save to History.</p>';return;}
+    var html='<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+    html+='<tr style="border-bottom:2px solid var(--border);font-weight:600;"><td style="padding:5px;">Date</td><td style="padding:5px;">Driver</td><td style="padding:5px;">Vehicle</td><td style="padding:5px;">Stops</td><td style="padding:5px;">Distance</td><td style="padding:5px;"></td></tr>';
+    rows.forEach(function(r){
+      var stops=[];
+      try{stops=JSON.parse(r.stops||'[]');}catch(e){}
+      html+='<tr style="border-bottom:1px solid var(--border);">';
+      html+='<td style="padding:5px;">'+r.route_date+'</td>';
+      html+='<td style="padding:5px;">'+(r.drivers?r.drivers.name:'—')+'</td>';
+      html+='<td style="padding:5px;">'+(r.vehicles?r.vehicles.name:'—')+'</td>';
+      html+='<td style="padding:5px;">'+stops.length+' stops</td>';
+      html+='<td style="padding:5px;">'+(r.total_km?r.total_km.toFixed(1)+' km':'—')+'</td>';
+      html+='<td style="padding:5px;"><button onclick="viewHistoryDetail(this)" data-stops=\''+JSON.stringify(stops).replace(/'/g,"&apos;")+'\' data-summary="'+(r.summary_text||'').replace(/"/g,'&quot;')+'" style="font-size:10px;padding:2px 6px;border:1px solid var(--border2);border-radius:3px;cursor:pointer;background:transparent;">View</button></td>';
+      html+='</tr>';
+    });
+    html+='</table>';
+    body.innerHTML=html;
+  }catch(e){
+    body.innerHTML='<span style="color:var(--danger);">Error loading history: '+e.message+'</span>';
+  }
+}
+
+function viewHistoryDetail(btn){
+  var summary=btn.getAttribute('data-summary');
+  if(summary) alert(summary.replace(/\\n/g,'\n'));
+}
+
+function saveToHistory(){
+  var txt=window._lastSummaryText||'';
+  var km=window._lastRouteKm||0;
+  if(!txt){toast('Generate route summary first');return;}
+  saveRouteHistory(txt,km);
+}
+
+async function saveRouteHistory(summaryText,totalKm){
+  var dIdx=document.getElementById('start-driver').value;
+  var vIdx=document.getElementById('start-vehicle').value;
+  var driverId=dIdx!==''&&drivers[dIdx]?drivers[dIdx].id||null:null;
+  var vehicleId=vIdx!==''&&vehicles[vIdx]?vehicles[vIdx].id||null:null;
+  var startTime=document.getElementById('start-time').value||'08:00';
+  var stopsData=routeStops.map(function(s,i){return {order:i+1,name:s.n,address:s.a,brand:s.b,dur:s.dur||15};});
+  var row={
+    route_date:new Date().toISOString().split('T')[0],
+    driver_id:driverId,
+    vehicle_id:vehicleId,
+    start_time:startTime,
+    stops:JSON.stringify(stopsData),
+    summary_text:summaryText,
+    total_km:totalKm||null
+  };
+  var result=await sb.from('route_history').insert(row);
+  if(!result.error) toast('Route saved to history!');
+  else toast('Could not save: '+result.error.message);
 }
 </script>
 </body>
