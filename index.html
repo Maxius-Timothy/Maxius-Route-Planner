@@ -135,9 +135,73 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 /* Timing input on route stop */
 .stop-dur{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px;margin-top:2px;}
 .stop-dur input{width:40px;padding:1px 3px;font-size:10px;text-align:center;}
+
+/* ── LOGIN SCREEN ─────────────────────────────────────────────────────────── */
+#login-screen{
+  position:fixed;inset:0;background:#1a1916;
+  display:flex;align-items:center;justify-content:center;
+  z-index:99999;flex-direction:column;
+}
+#login-box{
+  background:#fff;border-radius:10px;padding:36px 32px;
+  width:340px;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,.35);
+}
+#login-box h2{
+  font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:500;
+  color:#1a1916;margin-bottom:4px;letter-spacing:.03em;
+}
+#login-box p{font-size:12px;color:#6b6960;margin-bottom:20px;}
+#login-box label{
+  font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:#6b6960;display:block;margin-bottom:3px;
+}
+#login-box input{
+  width:100%;padding:9px 11px;font-size:13px;
+  border:1px solid #c8c6be;border-radius:5px;
+  background:#f5f4f0;color:#1a1916;
+  font-family:'IBM Plex Sans',sans-serif;margin-bottom:14px;
+}
+#login-box input:focus{outline:none;border-color:#1a4d8f;background:#fff;}
+#login-btn{
+  width:100%;padding:10px;background:#1a4d8f;color:#fff;
+  border:none;border-radius:5px;font-size:13px;font-weight:600;
+  font-family:'IBM Plex Sans',sans-serif;cursor:pointer;
+}
+#login-btn:hover{background:#163f75;}
+#login-btn:disabled{background:#aaa;cursor:not-allowed;}
+#login-error{
+  font-size:11px;color:#b83232;margin-top:8px;
+  display:none;text-align:center;
+}
+#login-logo{
+  font-family:'IBM Plex Mono',monospace;font-size:13px;
+  color:rgba(255,255,255,.4);margin-bottom:24px;letter-spacing:.08em;
+}
+#logout-btn{
+  font-size:10px;padding:3px 8px;border-radius:3px;
+  border:1px solid rgba(255,255,255,.25);background:transparent;
+  color:rgba(255,255,255,.7);cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+}
+#logout-btn:hover{background:rgba(255,255,255,.1);color:#fff;}
 </style>
 </head>
 <body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div id="login-logo">&#9632; MAXIUS ROUTE PLANNER</div>
+  <div id="login-box">
+    <h2>Sign in</h2>
+    <p>Enter your credentials to access the route planner.</p>
+    <label>Email</label>
+    <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email"/>
+    <label>Password</label>
+    <input type="password" id="login-password" placeholder="Password" autocomplete="current-password"/>
+    <button id="login-btn" onclick="doLogin()">Sign in</button>
+    <div id="login-error">Incorrect email or password. Please try again.</div>
+  </div>
+</div>
+
 <header>
   <h1>&#9632; SG Route Planner</h1>
   <button class="hbtn accent" onclick="openAddModal(false)">+ Store</button>
@@ -145,6 +209,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   <button class="hbtn" id="show-closed-btn" onclick="toggleShowClosed()">Show Closed</button>
   <button class="hbtn" onclick="openTab('drivers')">&#128101; Drivers &amp; Vehicles</button>
   <button class="hbtn" onclick="openTab('goods')">&#128230; Goods</button>
+  <button id="logout-btn" onclick="doLogout()">Sign out</button>
   <button class="hbtn" onclick="exportJSON()">&#8681; Backup</button>
   <button class="hbtn" onclick="importJSON()">&#8679; Restore</button>
   <button class="hbtn" onclick="openHistoryModal()">&#128336; History</button>
@@ -1264,13 +1329,22 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
   document.getElementById(id).addEventListener('click',function(e){if(e.target===this)closeModal(id);});
 });
 function toast(msg,dur=2400){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
-// ── INIT: load from Supabase then render ─────────────────────────────────────
-loadBrands();
-loadAllFromDB().then(function(ok){
-  buildFilters();renderList();renderMapMarkers();renderRoute();
-  renderDrivers();renderVehicles();renderGoods();populateDriverVehicleSelects();
-});
+// ── INIT: check session first, load data only if logged in ──────────────────
 document.getElementById('start-time').addEventListener('change',function(){renderRoute();drawRoute();});
+// Check if already logged in (e.g. page refresh with active session)
+checkSession().then(function(){
+  var {data}=sb.auth.getSession();
+  // If session exists, checkSession already called showApp + we need to load data
+  sb.auth.getSession().then(function(res){
+    if(res.data&&res.data.session){
+      loadBrands();
+      loadAllFromDB().then(function(){
+        buildFilters();renderList();renderMapMarkers();renderRoute();
+        renderDrivers();renderVehicles();renderGoods();populateDriverVehicleSelects();
+      });
+    }
+  });
+});
 
 function showRouteSummary(){
   if(!routeStops.length){toast('No stops in route');return;}
@@ -1420,6 +1494,67 @@ async function saveRouteHistory(summaryText,totalKm){
   var result=await sb.from('route_history').insert(row);
   if(!result.error) toast('Route saved to history!');
   else toast('Could not save: '+result.error.message);
+}
+
+// ── AUTHENTICATION ────────────────────────────────────────────────────────────
+async function checkSession(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(session){
+    showApp(session.user.email);
+  }
+  // if no session, login screen stays visible (it's shown by default)
+}
+
+function showApp(email){
+  document.getElementById('login-screen').style.display='none';
+  // Show user email in header somewhere subtle
+  const lbtn=document.getElementById('logout-btn');
+  if(lbtn)lbtn.title='Signed in as '+email;
+}
+
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  const btn=document.getElementById('login-btn');
+  const errEl=document.getElementById('login-error');
+  if(!email||!password){errEl.textContent='Please enter email and password.';errEl.style.display='block';return;}
+  btn.disabled=true;btn.textContent='Signing in...';
+  errEl.style.display='none';
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  if(error){
+    errEl.textContent='Incorrect email or password. Please try again.';
+    errEl.style.display='block';
+    btn.disabled=false;btn.textContent='Sign in';
+  }else{
+    showApp(data.user.email);
+    // Load app data now that we're logged in
+    loadBrands();
+    loadAllFromDB().then(function(){
+      buildFilters();renderList();renderMapMarkers();renderRoute();
+      renderDrivers();renderVehicles();renderGoods();populateDriverVehicleSelects();
+    });
+  }
+}
+
+// Allow pressing Enter to login
+document.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('login-password').addEventListener('keydown',function(e){
+    if(e.key==='Enter')doLogin();
+  });
+  document.getElementById('login-email').addEventListener('keydown',function(e){
+    if(e.key==='Enter')document.getElementById('login-password').focus();
+  });
+});
+
+async function doLogout(){
+  if(!confirm('Sign out?'))return;
+  await sb.auth.signOut();
+  // Clear local state
+  stores=[];routeStops=[];drivers=[];vehicles=[];goods=[];
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-email').value='';
+  document.getElementById('login-password').value='';
+  document.getElementById('login-error').style.display='none';
 }
 </script>
 </body>
